@@ -1,0 +1,29 @@
+name: 🐛 Bug Report
+description: الإبلاغ عن مشكلة
+labels: ["bug", "triage"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: وصف المشكلة
+      placeholder: اشرح المشكلة بوضوح
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: خطوات إعادة الإنتاج
+      placeholder: "1. اذهب إلى ...\n2. اضغط على ...\n3. ..."
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: السلوك المتوقع
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: البيئة (OS, Node version...)
+      placeholder: "Windows 11, Node 24"

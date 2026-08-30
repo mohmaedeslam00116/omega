@@ -1,0 +1,23 @@
+{
+  "name": "omega",
+  "version": "0.1.0",
+  "description": "Omega — مشروع مفتوح المصدر",
+  "type": "module",
+  "private": false,
+  "license": "MIT",
+  "author": "Mohamedeslamkg <mohmaedeslam7@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Mohamedeslamkg/omega.git"
+  },
+  "keywords": ["open-source", "omega", "typescript"],
+  "scripts": {
+    "check": "echo \"no checks yet\" && exit 0",
+    "lint": "echo \"no linter yet\" && exit 0",
+    "test": "echo \"no tests yet\" && exit 0",
+    "format": "prettier --write ."
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

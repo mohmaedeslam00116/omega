@@ -1,0 +1,28 @@
+name: ✨ Feature Request
+description: اقتراح ميزة جديدة
+labels: ["enhancement", "triage"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: ما المشكلة التي تحلها؟
+      placeholder: "أواجه صعوبة في ..."
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: الحل المقترح
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: بدائل فكرت فيها
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: تأكيد
+      options:
+        - label: بحثت في الـ Issues الحالية ولم أجد طلب مشابه
+          required: true
