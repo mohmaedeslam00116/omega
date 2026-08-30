@@ -1,23 +1,37 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+
 import '../../core/catalog/catalog_entry.dart';
 import '../../core/catalog/catalog_service.dart';
+import '../../core/download/download_manager.dart';
 
 class CatalogTab extends StatefulWidget {
-  const CatalogTab({super.key});
+  final CatalogService? catalogService;
+  final DownloadManager? downloadManager;
+
+  const CatalogTab({
+    super.key,
+    this.catalogService,
+    this.downloadManager,
+  });
 
   @override
   State<CatalogTab> createState() => _CatalogTabState();
 }
 
 class _CatalogTabState extends State<CatalogTab> {
-  late final CatalogService _service;
+  late final CatalogService _catalogService;
+  late final DownloadManager _downloadManager;
+
   List<CatalogEntry> _entries = [];
   bool _loading = true;
+  final Map<String, double> _progress = {};
+  final Set<String> _downloaded = {};
 
   @override
   void initState() {
     super.initState();
-    // Scaffold: load example catalog from asset file string (fake)
+    // Default: stub catalog + real download manager (with http client)
     const exampleJson = '''
 [
   {
@@ -48,18 +62,87 @@ class _CatalogTabState extends State<CatalogTab> {
   }
 ]
 ''';
-    _service = CatalogServiceStub(exampleJson);
+    _catalogService =
+        widget.catalogService ?? CatalogServiceStub(exampleJson);
+    _downloadManager =
+        widget.downloadManager ?? DownloadManagerImpl(client: http.Client());
     _load();
   }
 
   Future<void> _load({bool refresh = false}) async {
     setState(() => _loading = true);
-    final list = await _service.fetchCatalog(forceRefresh: refresh);
-    if (mounted) {
-      setState(() {
-        _entries = list;
-        _loading = false;
-      });
+    try {
+      final list = await _catalogService.fetchCatalog(forceRefresh: refresh);
+      // Check downloaded state for each entry (with timeout for test env)
+      final downloaded = <String>{};
+      for (final e in list) {
+        if (!e.bundled) {
+          try {
+            final isDl = await _downloadManager
+                .isDownloaded(e.id)
+                .timeout(const Duration(milliseconds: 200),
+                    onTimeout: () => false);
+            if (isDl) downloaded.add(e.id);
+          } catch (_) {}
+        }
+      }
+      if (mounted) {
+        setState(() {
+          _entries = list;
+          _downloaded
+            ..clear()
+            ..addAll(downloaded);
+          _loading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _loading = false);
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Failed to load catalog: $e')));
+      }
+    }
+  }
+
+  Future<void> _download(CatalogEntry entry) async {
+    setState(() => _progress[entry.id] = 0);
+    try {
+      await _downloadManager.download(
+        entry,
+        onProgress: (p) {
+          if (mounted) setState(() => _progress[entry.id] = p);
+        },
+      );
+      if (mounted) {
+        setState(() {
+          _progress.remove(entry.id);
+          _downloaded.add(entry.id);
+        });
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('${entry.name} downloaded')));
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _progress.remove(entry.id));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Download failed: $e')));
+      }
+    }
+  }
+
+  Future<void> _delete(CatalogEntry entry) async {
+    try {
+      await _downloadManager.delete(entry.id);
+      if (mounted) {
+        setState(() => _downloaded.remove(entry.id));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('${entry.name} deleted')));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Delete failed: $e')));
+      }
     }
   }
 
@@ -74,8 +157,7 @@ class _CatalogTabState extends State<CatalogTab> {
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
             child: Row(
               children: [
-                Text('Catalog',
-                    style: theme.textTheme.titleLarge),
+                Text('Catalog', style: theme.textTheme.titleLarge),
                 const Spacer(),
                 IconButton(
                   onPressed: () => _load(refresh: true),
@@ -102,10 +184,30 @@ class _CatalogTabState extends State<CatalogTab> {
                     child: ListView.separated(
                       padding: const EdgeInsets.all(16),
                       itemCount: _entries.length,
-                      separatorBuilder: (context, index) => const SizedBox(height: 12),
+                      separatorBuilder: (context, index) =>
+                          const SizedBox(height: 12),
                       itemBuilder: (context, i) {
                         final e = _entries[i];
                         final isBundled = e.bundled;
+                        final isDownloading = _progress.containsKey(e.id);
+                        final isDownloaded = _downloaded.contains(e.id);
+                        String badge;
+                        Color badgeBg;
+                        Color badgeFg;
+                        if (isBundled) {
+                          badge = 'Bundled';
+                          badgeBg = const Color(0xFFECFDF5);
+                          badgeFg = const Color(0xFF047857);
+                        } else if (isDownloaded) {
+                          badge = 'Downloaded';
+                          badgeBg = const Color(0xFFEFF6FF);
+                          badgeFg = const Color(0xFF1D4ED8);
+                        } else {
+                          badge = 'Download';
+                          badgeBg = const Color(0xFFF3F4F6);
+                          badgeFg = const Color(0xFF374151);
+                        }
+
                         return Card(
                           child: Padding(
                             padding: const EdgeInsets.all(16),
@@ -117,20 +219,28 @@ class _CatalogTabState extends State<CatalogTab> {
                                   decoration: BoxDecoration(
                                     color: isBundled
                                         ? const Color(0xFFECFDF5)
-                                        : const Color(0xFFF9FAFB),
+                                        : isDownloaded
+                                            ? const Color(0xFFEFF6FF)
+                                            : const Color(0xFFF9FAFB),
                                     borderRadius: BorderRadius.circular(12),
                                     border: Border.all(
                                         color: isBundled
                                             ? const Color(0xFFA7F3D0)
-                                            : const Color(0xFFE5E7EB)),
+                                            : isDownloaded
+                                                ? const Color(0xFFBFDBFE)
+                                                : const Color(0xFFE5E7EB)),
                                   ),
                                   child: Icon(
                                     isBundled
                                         ? Icons.verified
-                                        : Icons.download_outlined,
+                                        : isDownloaded
+                                            ? Icons.check_circle
+                                            : Icons.download_outlined,
                                     color: isBundled
                                         ? const Color(0xFF047857)
-                                        : const Color(0xFF6B7280),
+                                        : isDownloaded
+                                            ? const Color(0xFF1D4ED8)
+                                            : const Color(0xFF6B7280),
                                   ),
                                 ),
                                 const SizedBox(width: 14),
@@ -150,22 +260,16 @@ class _CatalogTabState extends State<CatalogTab> {
                                             padding: const EdgeInsets.symmetric(
                                                 horizontal: 8, vertical: 4),
                                             decoration: BoxDecoration(
-                                              color: isBundled
-                                                  ? const Color(0xFFECFDF5)
-                                                  : const Color(0xFFF3F4F6),
+                                              color: badgeBg,
                                               borderRadius:
                                                   BorderRadius.circular(20),
                                             ),
                                             child: Text(
-                                              isBundled
-                                                  ? 'Bundled'
-                                                  : 'Download',
+                                              badge,
                                               style: theme.textTheme.labelLarge
                                                   ?.copyWith(
                                                 fontSize: 10,
-                                                color: isBundled
-                                                    ? const Color(0xFF047857)
-                                                    : const Color(0xFF374151),
+                                                color: badgeFg,
                                               ),
                                             ),
                                           ),
@@ -179,9 +283,45 @@ class _CatalogTabState extends State<CatalogTab> {
                                                 color: const Color(0xFF6B7280),
                                                 fontSize: 11),
                                       ),
+                                      if (isDownloading) ...[
+                                        const SizedBox(height: 8),
+                                        LinearProgressIndicator(
+                                            value: _progress[e.id]),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                            '${((_progress[e.id] ?? 0) * 100).toInt()}%',
+                                            style: theme.textTheme.bodyMedium
+                                                ?.copyWith(
+                                                    fontSize: 10,
+                                                    color:
+                                                        const Color(0xFF6B7280))),
+                                      ],
                                     ],
                                   ),
                                 ),
+                                const SizedBox(width: 8),
+                                if (!isBundled)
+                                  isDownloading
+                                      ? SizedBox(
+                                          width: 24,
+                                          height: 24,
+                                          child: CircularProgressIndicator(
+                                              value: _progress[e.id],
+                                              strokeWidth: 2))
+                                      : isDownloaded
+                                          ? IconButton(
+                                              icon: const Icon(
+                                                  Icons.delete_outline,
+                                                  size: 20),
+                                              tooltip: 'Delete',
+                                              onPressed: () => _delete(e),
+                                            )
+                                          : IconButton(
+                                              icon: const Icon(
+                                                  Icons.download, size: 20),
+                                              tooltip: 'Download',
+                                              onPressed: () => _download(e),
+                                            ),
                               ],
                             ),
                           ),

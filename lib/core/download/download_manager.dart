@@ -21,6 +21,7 @@ abstract class DownloadManager {
   Future<void> delete(String id);
   Future<void> clearCache();
   Future<int> getCacheSize();
+  Future<bool> isDownloaded(String id);
 }
 
 class DownloadManagerImpl implements DownloadManager {
@@ -208,5 +209,12 @@ class DownloadManagerImpl implements DownloadManager {
       if (e is File) total += await e.length();
     }
     return total;
+  }
+
+  @override
+  Future<bool> isDownloaded(String id) async {
+    final base = await _getCacheDir();
+    final file = _fileFor(base, id);
+    return file.exists();
   }
 }

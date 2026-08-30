@@ -15,12 +15,15 @@ void main() {
 
     // Tap Catalog tab
     await tester.tap(find.text('Catalog').last);
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump(const Duration(milliseconds: 300));
     expect(find.text('General Photo 4×'), findsOneWidget);
 
     // Back to Upscale
     await tester.tap(find.text('Upscale').last);
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
     expect(find.text('No image selected'), findsOneWidget);
   });
 
