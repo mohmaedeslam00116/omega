@@ -33,4 +33,19 @@ void main() {
     await svc.setCatalogRefreshHours(12);
     expect(svc.catalogRefreshHours, 12);
   });
+
+  test('Save format + JPEG quality persist', () async {
+    final prefs = await SharedPreferences.getInstance();
+    final svc = SettingsService(prefs);
+    expect(svc.saveFormat, 'png'); // default lossless
+    expect(svc.jpegQuality, 90); // sensible default
+    await svc.setSaveFormat('jpeg');
+    await svc.setJpegQuality(75);
+    expect(svc.saveFormat, 'jpeg');
+    expect(svc.jpegQuality, 75);
+    // New instance should read persisted (across sessions).
+    final svc2 = SettingsService(await SharedPreferences.getInstance());
+    expect(svc2.saveFormat, 'jpeg');
+    expect(svc2.jpegQuality, 75);
+  });
 }

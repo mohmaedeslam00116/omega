@@ -14,7 +14,7 @@ abstract class ImageIoService {
   Stream<Uint8List?> get sharedImageStream;
   Future<void> validate(Uint8List bytes);
   Future<String> saveToGallery(Uint8List bytes,
-      {String filename, bool asJpeg = false});
+      {String? filename, bool asJpeg = false, int jpegQuality = 90});
   Future<void> shareImage(Uint8List bytes, {String filename});
 }
 
@@ -100,26 +100,36 @@ class ImageIoServiceImpl implements ImageIoService {
 
   @override
   Future<String> saveToGallery(Uint8List bytes,
-      {String filename = 'omega_upscaled.png', bool asJpeg = false}) async {
+      {String? filename, bool asJpeg = false, int jpegQuality = 90}) async {
     // Validate first
     await validate(bytes);
+    final name = filename ?? 'omega_upscaled.png';
+    final payload = asJpeg ? _reencodeJpeg(bytes, jpegQuality) : bytes;
     // Try Gal (MediaStore) if available
     try {
       if (galPutOverride != null) {
-        await galPutOverride!(bytes, filename);
+        await galPutOverride!(payload, name);
       } else {
         // Gal expects image bytes; it handles scoped storage
-        await Gal.putImageBytes(bytes, name: filename);
+        await Gal.putImageBytes(payload, name: name);
       }
-      return 'gallery:$filename';
+      return 'gallery:$name';
     } catch (_) {
       // Fallback: write to temp and return path
       final dir = await _getTempDir();
-      final file = File('${dir.path}/$filename');
+      final file = File('${dir.path}/$name');
       await file.create(recursive: true);
-      await file.writeAsBytes(bytes);
+      await file.writeAsBytes(payload);
       return file.path;
     }
+  }
+
+  /// Pipeline output is PNG; a JPEG save decodes it and re-encodes with the
+  /// chosen quality.
+  Uint8List _reencodeJpeg(Uint8List pngBytes, int quality) {
+    final decoded = img.decodeImage(pngBytes);
+    if (decoded == null) throw Exception('Failed to decode image');
+    return Uint8List.fromList(img.encodeJpg(decoded, quality: quality));
   }
 
   @override

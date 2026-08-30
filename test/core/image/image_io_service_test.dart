@@ -101,6 +101,34 @@ void main() {
       expect(await File(fallbackPath).exists(), true);
     });
 
+    test('saveToGallery re-encodes JPEG when asJpeg', () async {
+      final bytes = _makePng(50, 50);
+      Uint8List? captured;
+      final svc = ImageIoServiceImpl(
+        getTempDirOverride: () async => tmp,
+        galPutOverride: (b, name) async => captured = b,
+      );
+      final path = await svc.saveToGallery(bytes,
+          filename: 'test.jpg', asJpeg: true, jpegQuality: 80);
+      expect(path, contains('gallery:'));
+      expect(captured, isNotNull);
+      // JPEG SOI magic — a real re-encoded JPEG, not the input PNG.
+      expect(captured![0], 0xFF);
+      expect(captured![1], 0xD8);
+      expect(captured!.length, isNot(bytes.length));
+    });
+
+    test('saveToGallery passes PNG bytes through by default', () async {
+      final bytes = _makePng(50, 50);
+      Uint8List? captured;
+      final svc = ImageIoServiceImpl(
+        getTempDirOverride: () async => tmp,
+        galPutOverride: (b, name) async => captured = b,
+      );
+      await svc.saveToGallery(bytes, filename: 'test.png');
+      expect(captured, bytes);
+    });
+
     test('share sheet opens via shareOverride', () async {
       final bytes = _makePng(10, 10);
       var shared = false;

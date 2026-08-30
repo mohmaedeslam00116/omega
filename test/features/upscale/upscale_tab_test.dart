@@ -5,11 +5,13 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:omega/core/catalog/catalog_entry.dart';
 import 'package:omega/core/download/download_manager.dart';
 import 'package:omega/core/image/image_io_service.dart';
 import 'package:omega/core/pipeline/upscale_job_runner.dart';
 import 'package:omega/core/pipeline/upscale_pipeline.dart';
+import 'package:omega/core/settings/settings_service.dart';
 import 'package:omega/features/upscale/upscale_tab.dart';
 
 Uint8List _png(int w, int h) {
@@ -71,6 +73,7 @@ class _FakeImageIo implements ImageIoService {
   Uint8List? toReturn;
   bool saveCalled = false;
   bool shareCalled = false;
+  ({String filename, bool asJpeg, int jpegQuality})? lastSave;
   _FakeImageIo(this.toReturn);
   @override
   Future<Uint8List?> pickFromGallery() async => toReturn;
@@ -84,9 +87,16 @@ class _FakeImageIo implements ImageIoService {
   Future<void> validate(Uint8List bytes) async {}
   @override
   Future<String> saveToGallery(Uint8List bytes,
-      {String filename = 'a.png', bool asJpeg = false}) async {
+      {String? filename,
+      bool asJpeg = false,
+      int jpegQuality = 90}) async {
     saveCalled = true;
-    return 'gallery:$filename';
+    lastSave = (
+      filename: filename ?? 'a.png',
+      asJpeg: asJpeg,
+      jpegQuality: jpegQuality
+    );
+    return 'gallery:${filename ?? 'a.png'}';
   }
 
   @override
@@ -382,6 +392,94 @@ void main() {
     );
   });
 
+  testWidgets('Save sheet: JPEG choice reaches ImageIo and persists prefs',
+      (tester) async {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+    final settings = await SettingsService.init();
+    final fakeIo = _FakeImageIo(_png(64, 64));
+    final runner = _FakeRunner((img, config, prog, token) async {
+      prog?.call(1.0);
+      return _png(256, 256);
+    });
+
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: UpscaleTab(
+          imageIo: fakeIo,
+          runner: runner,
+          downloadManager: _FakeDownloadManager(downloaded: {}),
+          settingsService: settings,
+        ),
+      ),
+    ));
+    await tester.tap(find.text('Gallery'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Upscale 4×'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Save to Gallery'));
+    await tester.pumpAndSettle();
+    expect(find.text('Save image'), findsOneWidget);
+    expect(find.text('PNG'), findsOneWidget);
+    expect(find.text('JPEG'), findsOneWidget);
+    // PNG default -> no quality slider
+    expect(find.byKey(const ValueKey('jpegQuality')), findsNothing);
+
+    await tester.tap(find.text('JPEG'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('jpegQuality')), findsOneWidget);
+
+    await tester.tap(find.text('Save image'));
+    await tester.pumpAndSettle();
+
+    expect(fakeIo.saveCalled, true);
+    expect(fakeIo.lastSave?.asJpeg, true);
+    expect(fakeIo.lastSave?.filename, 'omega_upscaled.jpg');
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getString('saveFormat'), 'jpeg');
+    expect(prefs.getInt('jpegQuality'), 90);
+  });
+
+  testWidgets('Save sheet recalls the remembered format and quality',
+      (tester) async {
+    SharedPreferences.setMockInitialValues(
+        <String, Object>{'saveFormat': 'jpeg', 'jpegQuality': 70});
+    final settings = await SettingsService.init();
+    final fakeIo = _FakeImageIo(_png(64, 64));
+    final runner = _FakeRunner((img, config, prog, token) async {
+      prog?.call(1.0);
+      return _png(256, 256);
+    });
+
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: UpscaleTab(
+          imageIo: fakeIo,
+          runner: runner,
+          downloadManager: _FakeDownloadManager(downloaded: {}),
+          settingsService: settings,
+        ),
+      ),
+    ));
+    await tester.tap(find.text('Gallery'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Upscale 4×'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Save to Gallery'));
+    await tester.pumpAndSettle();
+    // Remembered: JPEG selected -> quality slider shows the stored value.
+    expect(find.byKey(const ValueKey('jpegQuality')), findsOneWidget);
+    final slider = tester.widget<Slider>(find.byKey(const ValueKey('jpegQuality')));
+    expect(slider.value, 70);
+
+    await tester.tap(find.text('Save image'));
+    await tester.pumpAndSettle();
+    expect(fakeIo.lastSave?.asJpeg, true);
+    expect(fakeIo.lastSave?.jpegQuality, 70);
+    expect(fakeIo.lastSave?.filename, 'omega_upscaled.jpg');
+  });
+
   testWidgets(
       'After complete, slider compares before/after and Save/Share succeed',
       (tester) async {
@@ -394,7 +492,14 @@ void main() {
     });
 
     await tester.pumpWidget(MaterialApp(
-      home: Scaffold(body: UpscaleTab(imageIo: fakeIo, runner: runner, downloadManager: _FakeDownloadManager(downloaded: {}))),
+      home: Scaffold(
+        body: UpscaleTab(
+          imageIo: fakeIo,
+          runner: runner,
+          downloadManager: _FakeDownloadManager(downloaded: {}),
+          settingsService: await SettingsService.init(),
+        ),
+      ),
     ));
     await tester.tap(find.text('Gallery'));
     await tester.pumpAndSettle();
@@ -408,6 +513,9 @@ void main() {
     expect(find.text('Share'), findsOneWidget);
 
     await tester.tap(find.text('Save to Gallery'));
+    await tester.pumpAndSettle();
+    // The save sheet opens; confirm with the default (PNG).
+    await tester.tap(find.text('Save image'));
     await tester.pumpAndSettle();
     expect(fakeIo.saveCalled, true);
 

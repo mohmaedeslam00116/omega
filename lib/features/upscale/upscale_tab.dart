@@ -7,11 +7,13 @@ import '../../core/download/download_manager.dart';
 import '../../core/image/image_io_service.dart';
 import '../../core/pipeline/upscale_job_runner.dart';
 import '../../core/pipeline/upscale_pipeline.dart';
+import '../../core/settings/settings_service.dart';
 
 class UpscaleTab extends StatefulWidget {
   final ImageIoService? imageIo;
   final UpscaleJobRunner? runner;
   final DownloadManager? downloadManager;
+  final SettingsService? settingsService;
   final bool useGpu;
   final List<CatalogEntry>? catalog;
 
@@ -20,6 +22,7 @@ class UpscaleTab extends StatefulWidget {
     this.imageIo,
     this.runner,
     this.downloadManager,
+    this.settingsService,
     this.useGpu = false,
     this.catalog,
   });
@@ -42,6 +45,7 @@ class _UpscaleTabState extends State<UpscaleTab> {
   double _slider = 0.5;
   CatalogEntry? _selected;
   CancelToken? _activeToken;
+  SettingsService? _settings;
 
   /// CatalogEntry ids available locally: bundled always, Downloaded on demand.
   final Set<String> _downloadedIds = {};
@@ -59,6 +63,11 @@ class _UpscaleTabState extends State<UpscaleTab> {
     _selected =
         _catalog.firstWhere((e) => e.bundled, orElse: () => _catalog.first);
     _refreshDownloadedIds();
+    _initSettings();
+  }
+
+  Future<void> _initSettings() async {
+    _settings = widget.settingsService ?? await SettingsService.init();
   }
 
   static final List<CatalogEntry> _defaultCatalog = [
@@ -233,8 +242,27 @@ class _UpscaleTabState extends State<UpscaleTab> {
 
   Future<void> _save() async {
     if (_outputBytes == null) return;
+    final choice = await showModalBottomSheet<(String, int)>(
+      context: context,
+      builder: (_) => _SaveFormatSheet(
+        initialFormat: _settings?.saveFormat ?? 'png',
+        initialQuality: _settings?.jpegQuality ?? 90,
+      ),
+    );
+    if (choice == null) return;
+    final format = choice.$1;
+    final quality = choice.$2;
+    await _settings?.setSaveFormat(format);
+    await _settings?.setJpegQuality(quality);
     try {
-      final path = await _imageIo.saveToGallery(_outputBytes!);
+      final filename =
+          format == 'jpeg' ? 'omega_upscaled.jpg' : 'omega_upscaled.png';
+      final path = await _imageIo.saveToGallery(
+        _outputBytes!,
+        filename: filename,
+        asJpeg: format == 'jpeg',
+        jpegQuality: quality,
+      );
       if (!mounted) return;
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text('Saved: $path')));
@@ -559,6 +587,126 @@ class _UpscaleTabState extends State<UpscaleTab> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Bottom sheet for the save flow: PNG (lossless) or JPEG with a quality
+/// slider. Pre-filled from the remembered SettingsService preference and
+/// returns `(format, quality)` — persisted by the caller.
+class _SaveFormatSheet extends StatefulWidget {
+  final String initialFormat;
+  final int initialQuality;
+
+  const _SaveFormatSheet({
+    required this.initialFormat,
+    required this.initialQuality,
+  });
+
+  @override
+  State<_SaveFormatSheet> createState() => _SaveFormatSheetState();
+}
+
+class _SaveFormatSheetState extends State<_SaveFormatSheet> {
+  late String _format = widget.initialFormat;
+  late int _quality = widget.initialQuality.clamp(1, 100);
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text('Save options', style: theme.textTheme.titleMedium),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _formatCard(
+                  context,
+                  label: 'PNG',
+                  subtitle: 'Lossless',
+                  selected: _format == 'png',
+                  onTap: () => setState(() => _format = 'png'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _formatCard(
+                  context,
+                  label: 'JPEG',
+                  subtitle: 'Smaller files',
+                  selected: _format == 'jpeg',
+                  onTap: () => setState(() => _format = 'jpeg'),
+                ),
+              ),
+            ],
+          ),
+          if (_format == 'jpeg') ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                const Text('Quality',
+                    style: TextStyle(fontSize: 12, color: Color(0xFF6B7280))),
+                Expanded(
+                  child: Slider(
+                    key: const ValueKey('jpegQuality'),
+                    value: _quality.toDouble(),
+                    min: 1,
+                    max: 100,
+                    divisions: 99,
+                    label: '$_quality',
+                    onChanged: (v) => setState(() => _quality = v.round()),
+                  ),
+                ),
+                Text('$_quality', style: theme.textTheme.labelLarge),
+              ],
+            ),
+          ],
+          const SizedBox(height: 12),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, (_format, _quality)),
+            child: const Text('Save image'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _formatCard(
+    BuildContext context, {
+    required String label,
+    required String subtitle,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    final theme = Theme.of(context);
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: selected ? const Color(0xFF1A1A2E) : const Color(0xFFE5E7EB),
+            width: selected ? 1.6 : 1,
+          ),
+          color: selected ? const Color(0xFFF3F4FF) : Colors.white,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label, style: theme.textTheme.titleMedium),
+            Text(subtitle,
+                style: theme.textTheme.bodyMedium
+                    ?.copyWith(fontSize: 11, color: const Color(0xFF6B7280))),
+          ],
+        ),
       ),
     );
   }
