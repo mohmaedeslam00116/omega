@@ -47,16 +47,46 @@ class CatalogEntry {
   });
 
   factory CatalogEntry.fromJson(Map<String, dynamic> json) {
+    // Validate required fields
+    for (final k in [
+      'id',
+      'name',
+      'scale',
+      'type',
+      'inputSize',
+      'fileSize',
+      'sha256',
+      'url',
+      'license',
+      'version'
+    ]) {
+      if (!json.containsKey(k) || json[k] == null) {
+        throw FormatException('Missing required field: $k in $json');
+      }
+    }
+    final scale = json['scale'] as int;
+    final inputSize = json['inputSize'] as int;
+    final license = json['license'] as String;
+    if (scale != 4) {
+      throw FormatException('Invalid scale $scale, expected 4 for $json');
+    }
+    if (inputSize != 128) {
+      throw FormatException(
+          'Invalid inputSize $inputSize, expected 128 for $json');
+    }
+    if (license.isEmpty) {
+      throw FormatException('License must not be empty for $json');
+    }
     return CatalogEntry(
       id: json['id'] as String,
       name: json['name'] as String,
-      scale: json['scale'] as int,
+      scale: scale,
       type: _typeFromString(json['type'] as String),
-      inputSize: json['inputSize'] as int,
+      inputSize: inputSize,
       fileSize: json['fileSize'] as int,
       sha256: json['sha256'] as String,
       url: json['url'] as String,
-      license: json['license'] as String,
+      license: license,
       version: json['version'] as String,
       bundled: json['bundled'] as bool? ?? false,
     );

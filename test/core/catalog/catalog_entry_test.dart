@@ -50,5 +50,72 @@ void main() {
         throwsArgumentError,
       );
     });
+
+    test('validates scale must be 4', () {
+      expect(
+        () => CatalogEntry.fromJson({
+          'id': 'x',
+          'name': 'n',
+          'scale': 2,
+          'type': 'general',
+          'inputSize': 128,
+          'fileSize': 1,
+          'sha256': 'abc',
+          'url': 'u',
+          'license': 'MIT',
+          'version': '1'
+        }),
+        throwsA(isA<FormatException>()),
+      );
+    });
+
+    test('validates inputSize must be 128', () {
+      expect(
+        () => CatalogEntry.fromJson({
+          'id': 'x',
+          'name': 'n',
+          'scale': 4,
+          'type': 'general',
+          'inputSize': 64,
+          'fileSize': 1,
+          'sha256': 'abc',
+          'url': 'u',
+          'license': 'MIT',
+          'version': '1'
+        }),
+        throwsA(isA<FormatException>()),
+      );
+    });
+
+    test('validates license not empty and surfaces it', () {
+      final e = CatalogEntry.fromJson({
+        'id': 'x',
+        'name': 'n',
+        'scale': 4,
+        'type': 'general',
+        'inputSize': 128,
+        'fileSize': 1,
+        'sha256': 'abc',
+        'url': 'u',
+        'license': 'BSD-3-Clause',
+        'version': '1'
+      });
+      expect(e.license, 'BSD-3-Clause');
+      expect(
+        () => CatalogEntry.fromJson({
+          'id': 'x',
+          'name': 'n',
+          'scale': 4,
+          'type': 'general',
+          'inputSize': 128,
+          'fileSize': 1,
+          'sha256': 'abc',
+          'url': 'u',
+          'license': '',
+          'version': '1'
+        }),
+        throwsA(isA<FormatException>()),
+      );
+    });
   });
 }

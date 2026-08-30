@@ -1,17 +1,18 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
 
 import 'catalog_entry.dart';
 
 /// Highest-level catalog seam. Fetches versioned Catalog from GitHub Releases
-/// raw URL with 24h file cache (simplified for scaffold: in-memory cache).
+/// raw URL with 24h file cache (file + in-memory).
 abstract class CatalogService {
   Future<List<CatalogEntry>> fetchCatalog({bool forceRefresh = false});
   Future<List<CatalogEntry>> getCached();
 }
 
-/// Minimal in-memory implementation for scaffold; real implementation (Ticket 02)
-/// will add disk cache, 24h expiry, and HTTP fetch.
+/// Minimal in-memory implementation for scaffold; kept for tests.
 class CatalogServiceStub implements CatalogService {
   final String catalogJson;
   List<CatalogEntry>? _cache;
@@ -25,7 +26,6 @@ class CatalogServiceStub implements CatalogService {
       final age = DateTime.now().difference(_cachedAt!);
       if (age.inHours < 24) return _cache!;
     }
-    // Simulate network delay for stub
     await Future<void>.delayed(const Duration(milliseconds: 10));
     final entries = CatalogEntry.listFromJson(catalogJson);
     _cache = entries;
@@ -37,30 +37,87 @@ class CatalogServiceStub implements CatalogService {
   Future<List<CatalogEntry>> getCached() async => _cache ?? [];
 }
 
-/// HTTP-backed implementation (skeleton for Ticket 02).
+/// HTTP-backed implementation with 24h disk + memory cache.
+/// Ticket 02: real catalog from GitHub Releases raw URL.
 class HttpCatalogService implements CatalogService {
   final http.Client client;
   final String catalogUrl;
+  final Future<Directory> Function()? getCacheDirOverride;
+  final Duration expiry;
   List<CatalogEntry>? _cache;
   DateTime? _cachedAt;
 
-  HttpCatalogService({required this.client, required this.catalogUrl});
+  HttpCatalogService({
+    required this.client,
+    required this.catalogUrl,
+    this.getCacheDirOverride,
+    this.expiry = const Duration(hours: 24),
+  });
+
+  Future<Directory> _getCacheDir() async {
+    if (getCacheDirOverride != null) return getCacheDirOverride!();
+    return getApplicationSupportDirectory();
+  }
+
+  File _cacheFile(Directory dir) => File('${dir.path}/catalog.json');
 
   @override
   Future<List<CatalogEntry>> fetchCatalog({bool forceRefresh = false}) async {
-    if (!forceRefresh && _cache != null && _cachedAt != null) {
-      if (DateTime.now().difference(_cachedAt!).inHours < 24) return _cache!;
+    final dir = await _getCacheDir();
+    final file = _cacheFile(dir);
+
+    if (!forceRefresh) {
+      // 1) in-memory check
+      if (_cache != null && _cachedAt != null) {
+        if (DateTime.now().difference(_cachedAt!) < expiry) return _cache!;
+      }
+      // 2) disk check
+      if (await file.exists()) {
+        final stat = await file.stat();
+        final age = DateTime.now().difference(stat.modified);
+        if (age < expiry) {
+          try {
+            final content = await file.readAsString();
+            final entries = CatalogEntry.listFromJson(content);
+            _cache = entries;
+            _cachedAt = stat.modified;
+            return entries;
+          } catch (_) {
+            // corrupt cache → fall through to network
+          }
+        }
+      }
     }
+
     final res = await client.get(Uri.parse(catalogUrl));
     if (res.statusCode != 200) {
       throw Exception('Failed to fetch catalog: ${res.statusCode}');
     }
-    final entries = CatalogEntry.listFromJson(utf8.decode(res.bodyBytes));
+    final bodyStr = utf8.decode(res.bodyBytes);
+    final entries = CatalogEntry.listFromJson(bodyStr);
+    // write to disk (overwrite)
+    await file.create(recursive: true);
+    await file.writeAsString(bodyStr);
     _cache = entries;
     _cachedAt = DateTime.now();
     return entries;
   }
 
   @override
-  Future<List<CatalogEntry>> getCached() async => _cache ?? [];
+  Future<List<CatalogEntry>> getCached() async {
+    if (_cache != null) return _cache!;
+    // try disk
+    try {
+      final dir = await _getCacheDir();
+      final file = _cacheFile(dir);
+      if (await file.exists()) {
+        final stat = await file.stat();
+        if (DateTime.now().difference(stat.modified) < expiry) {
+          final content = await file.readAsString();
+          return CatalogEntry.listFromJson(content);
+        }
+      }
+    } catch (_) {}
+    return [];
+  }
 }
