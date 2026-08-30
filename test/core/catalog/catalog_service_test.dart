@@ -148,7 +148,8 @@ void main() {
         catalogUrl: 'https://example.com/catalog.json',
         getCacheDirOverride: () async => tmp,
       );
-      expect(() => svc.fetchCatalog(), throwsA(isA<FormatException>()));
+      await expectLater(() => svc.fetchCatalog(),
+          throwsA(isA<FormatException>()));
 
       const badInput = '''
 [{"id":"x","name":"n","scale":4,"type":"general","inputSize":64,"fileSize":1,"sha256":"a","url":"u","license":"MIT","version":"1"}]''';
@@ -158,7 +159,8 @@ void main() {
         catalogUrl: 'https://example.com/catalog.json',
         getCacheDirOverride: () async => Directory.systemTemp.createTemp(),
       );
-      expect(() => svc2.fetchCatalog(), throwsA(isA<FormatException>()));
+      await expectLater(() => svc2.fetchCatalog(),
+          throwsA(isA<FormatException>()));
     });
 
     test('getCached returns disk entry if memory empty', () async {
