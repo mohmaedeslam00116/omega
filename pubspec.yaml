@@ -45,6 +45,17 @@ dependencies:
   gal: ^2.3.3
   shared_preferences: ^2.5.5
 
+# ── Omega patch ──────────────────────────────────────────────────────────────
+# receive_sharing_intent 1.9.0 ships a broken Android build.gradle: it uses the
+# `kotlin { compilerOptions }` DSL without applying the Kotlin Android plugin
+# (breaks with Flutter 3.41+ / AGP 8.11) and hard-codes compileSdk 37 (not
+# installed on this host). We vendor a patched copy under third_party/ and point
+# the dependency at it. See third_party/receive_sharing_intent/android/build.gradle.
+# ──────────────────────────────────────────────────────────────────────────────
+dependency_overrides:
+  receive_sharing_intent:
+    path: third_party/receive_sharing_intent
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

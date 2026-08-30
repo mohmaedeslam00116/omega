@@ -1,0 +1,69 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
+buildscript {
+    ext.kotlin_version = '2.4.0'
+    repositories {
+        google()
+        mavenCentral()
+    }
+
+    dependencies {
+        classpath 'com.android.tools.build:gradle:9.2.1'
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+    }
+}
+
+plugins {
+    id "com.android.library"
+}
+
+// ── Omega patch ──────────────────────────────────────────────────────────────
+// Upstream 1.9.0 uses the `kotlin { compilerOptions }` extension below but
+// never applies the Kotlin Android plugin, so Gradle fails with
+// "Could not find method kotlin() for arguments [...]" because the Flutter
+// Gradle plugin (3.41+) no longer auto-applies Kotlin to plugin projects.
+// We apply `kotlin-android` here, resolved from the buildscript classpath
+// declared above (Kotlin 2.4.0), so the DSL and the JvmTarget enum come from
+// the same classloader.
+// ──────────────────────────────────────────────────────────────────────────────
+apply plugin: 'kotlin-android'
+
+group 'com.kasem.receive_sharing_intent'
+version '1.9.0'
+
+rootProject.allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+android {
+    if (project.android.hasProperty("namespace")) {
+        namespace 'com.kasem.receive_sharing_intent'
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    sourceSets {
+        main.java.srcDirs += 'src/main/kotlin'
+    }
+    defaultConfig {
+        compileSdk 36 // PATCH: upstream declares 37; host AGP (8.11.1) + installed SDK target is 36
+        minSdkVersion 21
+        testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
+    }
+    lintOptions {
+        disable 'InvalidPackage'
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget = JvmTarget.JVM_17
+    }
+}
+
