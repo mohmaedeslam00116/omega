@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:typed_data';
 import 'package:image/image.dart' as img;
 
@@ -13,13 +14,13 @@ class UpscalePipeline {
   UpscalePipeline({
     required this.engine,
     this.tileSize = 128,
-    this.overlap = 32,
+    this.overlap = 36,
     this.scale = 4,
   });
 
   /// Highest seam: upscale imageBytes (encoded PNG/JPEG) -> upscaled bytes (PNG).
-  /// Validates 4096 limit, tiles, runs Engine per tile (Preprocess -> infer ->
-  /// Stitch), composites, reports progress.
+  /// Validates 4096 limit, tiles with overlap, runs Engine per tile
+  /// (Preprocess -> infer -> feathered Stitch), reports progress.
   Future<Uint8List> upscale(
     Uint8List imageBytes, {
     void Function(double progress)? onProgress,
@@ -44,6 +45,19 @@ class UpscalePipeline {
       e is OutOfMemoryError ||
       e.toString().contains('out of memory');
 
+  /// Stride = tileSize - overlap, floored so neighbouring tiles always share
+  /// at least half a tile (guards against overlap >= tileSize).
+  int _strideFor(int ts) => ts - math.min(overlap, ts ~/ 2);
+
+  /// Tile origins along one axis. Every tile is FULL size: origins are clamped
+  /// so the last tile ends exactly at the edge (w >= ts), and a single tile
+  /// covers a shorter axis (w < ts, padded by Preprocess).
+  List<int> _positions(int length, int ts, int stride) {
+    if (length <= ts) return const [0];
+    final count = ((length - ts) / stride).ceil() + 1;
+    return List.generate(count, (i) => math.min(i * stride, length - ts));
+  }
+
   Future<Uint8List> _process(
     Uint8List imageBytes,
     int ts,
@@ -58,44 +72,46 @@ class UpscalePipeline {
       throw UnsupportedError('Image exceeds 4096px, please crop or choose smaller');
     }
 
-    // Simple tiling: stride = tileSize (no overlap for count), but overlap handled in stitch feather.
-    // For 1024 with 128 -> 8x8=64 tiles as per spec.
-    final stride = ts; // keep 64 tiles for 1024 as spec expects
-    final tilesX = (w / stride).ceil();
-    final tilesY = (h / stride).ceil();
-    final totalTiles = tilesX * tilesY;
+    final stride = _strideFor(ts);
+    final xs = _positions(w, ts, stride);
+    final ys = _positions(h, ts, stride);
+    final totalTiles = xs.length * ys.length;
 
-    // Output canvas
+    // Output canvas (flat RGB) + per-pixel coverage weights for the feather.
     final outW = w * scale;
     final outH = h * scale;
-    final output = img.Image(width: outW, height: outH);
+    final canvas = Uint8List(outW * outH * 3);
+    final weights = Uint8List(outW * outH);
+    final outSide = ts * scale;
+    final window = featherWeights(size: outSide, feather: overlap * scale);
 
     int done = 0;
-    for (int ty = 0; ty < tilesY; ty++) {
-      for (int tx = 0; tx < tilesX; tx++) {
-        final x = tx * stride;
-        final y = ty * stride;
-        final cw = (x + ts > w) ? w - x : ts;
-        final ch = (y + ts > h) ? h - y : ts;
+    for (final y in ys) {
+      for (final x in xs) {
+        // Full-size source tile (edges clamped; shorter axes padded later by
+        // Preprocess edge replication).
+        final tile = img.copyCrop(decoded,
+            x: x, y: y, width: math.min(ts, w - x), height: math.min(ts, h - y));
 
-        // Crop tile
-        final tile = img.copyCrop(decoded, x: x, y: y, width: cw, height: ch);
-
-        // Preprocess: tile -> float32 NHWC tensor at the Model's input size
-        // (edge tiles are edge-replicated up to full size).
+        // Preprocess: tile -> float32 NHWC tensor at the Model's input size.
         final input = preprocessTile(tile, inputSize: ts);
 
         // Engine: real Model inference (deterministic stub in tests).
         final tensorOut = await engine.infer(input);
 
-        // Stitch: tensor -> pixels; crop the valid region back out of the
-        // padded output for edge tiles, then composite onto the canvas.
-        final outTile = tileFromTensor(tensorOut, outputSize: ts * scale);
-        final cropped = (cw == ts && ch == ts)
-            ? outTile
-            : img.copyCrop(outTile,
-                x: 0, y: 0, width: cw * scale, height: ch * scale);
-        img.compositeImage(output, cropped, dstX: x * scale, dstY: y * scale);
+        // Stitch: tensor -> pixels, feather-blended into the canvas.
+        final outTile = tileFromTensor(tensorOut, outputSize: outSide);
+        stitchTile(
+          canvas: canvas,
+          weights: weights,
+          canvasWidth: outW,
+          canvasHeight: outH,
+          tile: outTile.getBytes(order: img.ChannelOrder.rgb),
+          tileSide: outSide,
+          window: window,
+          dstX: x * scale,
+          dstY: y * scale,
+        );
 
         done++;
         if (onProgress != null) onProgress(done / totalTiles);
@@ -105,6 +121,12 @@ class UpscalePipeline {
       }
     }
 
+    final output = img.Image.fromBytes(
+      width: outW,
+      height: outH,
+      bytes: canvas.buffer,
+      numChannels: 3,
+    );
     return Uint8List.fromList(img.encodePng(output));
   }
 }

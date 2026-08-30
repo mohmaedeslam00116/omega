@@ -50,3 +50,72 @@ img.Image tileFromTensor(Float32List tensor, {required int outputSize}) {
 }
 
 int _toByte(double v) => (v * 255.0).round().clamp(0, 255);
+
+/// **Stitch** — per-tile feather weight window: 1.0 in the tile interior,
+/// ramping linearly to ~0 at the borders over [feather] pixels (per axis,
+/// combined multiplicatively). A [feather] of 0 disables the ramp (all 1.0).
+Float32List featherWeights({required int size, required int feather}) {
+  final w = Float32List(size * size);
+  for (int y = 0; y < size; y++) {
+    final wy =
+        feather <= 0 ? 1.0 : math.min(1.0, math.min(y + 0.5, size - y - 0.5) / feather);
+    for (int x = 0; x < size; x++) {
+      final wx = feather <= 0
+          ? 1.0
+          : math.min(1.0, math.min(x + 0.5, size - x - 0.5) / feather);
+      w[y * size + x] = wx * wy;
+    }
+  }
+  return w;
+}
+
+/// **Stitch** — blend one upscaled [tile] (flat RGB bytes, [tileSide]² px)
+/// into the flat RGB [canvas] at ([dstX], [dstY]) using the feather [window].
+///
+/// Blending is a running weighted average: each canvas pixel carries its
+/// accumulated coverage in [weights] (1 byte per pixel, 0..255). Where only
+/// one tile covers a pixel, that tile's value wins exactly; where tiles
+/// overlap, the result is the weight-averaged crossfade — no hard seams.
+/// Writes are clipped to the canvas ([canvasWidth] x [canvasHeight]), so a
+/// padded tile on an image smaller than the tile size cannot overflow.
+void stitchTile({
+  required Uint8List canvas,
+  required Uint8List weights,
+  required int canvasWidth,
+  required int canvasHeight,
+  required Uint8List tile,
+  required int tileSide,
+  required Float32List window,
+  required int dstX,
+  required int dstY,
+}) {
+  final cols = math.min(tileSide, canvasWidth - dstX);
+  final rows = math.min(tileSide, canvasHeight - dstY);
+  for (int oy = 0; oy < rows; oy++) {
+    final crow = ((dstY + oy) * canvasWidth + dstX) * 3;
+    final trow = oy * tileSide * 3;
+    final wrow = (dstY + oy) * canvasWidth + dstX;
+    for (int ox = 0; ox < cols; ox++) {
+      final w = window[oy * tileSide + ox];
+      final ci = crow + ox * 3;
+      final ti = trow + ox * 3;
+      final stored = weights[wrow + ox];
+      if (stored == 0) {
+        canvas[ci] = tile[ti];
+        canvas[ci + 1] = tile[ti + 1];
+        canvas[ci + 2] = tile[ti + 2];
+        weights[wrow + ox] = (w * 255).round().clamp(1, 255);
+        continue;
+      }
+      final w0 = stored / 255.0;
+      final total = w0 + w;
+      canvas[ci] = _blendByte(canvas[ci], tile[ti], w0, total);
+      canvas[ci + 1] = _blendByte(canvas[ci + 1], tile[ti + 1], w0, total);
+      canvas[ci + 2] = _blendByte(canvas[ci + 2], tile[ti + 2], w0, total);
+      weights[wrow + ox] = (total * 255).round().clamp(1, 255);
+    }
+  }
+}
+
+int _blendByte(int c0, int c1, double w0, double total) =>
+    ((c0 * w0 + c1 * (total - w0)) / total).round().clamp(0, 255);

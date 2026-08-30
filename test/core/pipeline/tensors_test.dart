@@ -127,4 +127,129 @@ void main() {
       expect(p.b, 255);
     });
   });
+
+  group('Stitch (featherWeights)', () {
+    test('all ones when feather is zero', () {
+      final w = featherWeights(size: 4, feather: 0);
+      expect(w.length, 16);
+      for (final v in w) {
+        expect(v, 1.0);
+      }
+    });
+
+    test('center is fully weighted, edges ramp down, corners smallest', () {
+      const size = 8;
+      const feather = 2;
+      final w = featherWeights(size: size, feather: feather);
+
+      double at(int x, int y) => w[y * size + x];
+      expect(at(4, 4), 1.0);
+      // symmetric horizontally and vertically
+      expect(at(0, 4), at(7, 4));
+      expect(at(4, 0), at(4, 7));
+      // edges are ramped down, corners are the product of two ramps
+      expect(at(0, 4), lessThan(1.0));
+      expect(at(0, 0), lessThan(at(0, 4)));
+      // inside the feather margin from the edge, weight is 1
+      expect(at(2, 4), 1.0);
+    });
+  });
+
+  group('Stitch (stitchTile)', () {
+    // 4x4 tile, feather 2, on a 6x4 canvas: tile1 at dst(0,0), tile2 at
+    // dst(2,0) -> columns 2..3 are covered by both tiles.
+    Uint8List constTile(int side, int v) =>
+        Uint8List.fromList(List.filled(side * side * 3, v));
+
+    test('single tile writes its pixels and registers coverage', () {
+      final canvas = Uint8List(6 * 4 * 3);
+      final weights = Uint8List(6 * 4);
+      final window = featherWeights(size: 4, feather: 2);
+      final tile = constTile(4, 100);
+
+      stitchTile(
+        canvas: canvas,
+        weights: weights,
+        canvasWidth: 6,
+        canvasHeight: 4,
+        tile: tile,
+        tileSide: 4,
+        window: window,
+        dstX: 0,
+        dstY: 0,
+      );
+
+      final i = (1 * 6 + 1) * 3;
+      expect(canvas[i], 100);
+      expect(canvas[i + 1], 100);
+      expect(canvas[i + 2], 100);
+      expect(weights[1 * 6 + 1], greaterThan(0));
+    });
+
+    test('writes are clipped to the canvas (image smaller than tile)', () {
+      // Canvas 2x2 with a full 4x4 tile at (0,0): the padded overflow must be
+      // discarded, not overflow into memory.
+      final canvas = Uint8List(2 * 2 * 3);
+      final weights = Uint8List(2 * 2);
+      final window = featherWeights(size: 4, feather: 2);
+
+      stitchTile(
+        canvas: canvas,
+        weights: weights,
+        canvasWidth: 2,
+        canvasHeight: 2,
+        tile: constTile(4, 100),
+        tileSide: 4,
+        window: window,
+        dstX: 0,
+        dstY: 0,
+      );
+
+      expect(weights[0], greaterThan(0));
+      expect(weights[1 * 2 + 1], greaterThan(0));
+      expect(canvas[(1 * 2 + 1) * 3], 100);
+    });
+
+    test('overlap blends the two tiles instead of hard-copying', () {
+      final canvas = Uint8List(6 * 4 * 3);
+      final weights = Uint8List(6 * 4);
+      final window = featherWeights(size: 4, feather: 2);
+
+      stitchTile(
+        canvas: canvas,
+        weights: weights,
+        canvasWidth: 6,
+        canvasHeight: 4,
+        tile: constTile(4, 100),
+        tileSide: 4,
+        window: window,
+        dstX: 0,
+        dstY: 0,
+      );
+      stitchTile(
+        canvas: canvas,
+        weights: weights,
+        canvasWidth: 6,
+        canvasHeight: 4,
+        tile: constTile(4, 200),
+        tileSide: 4,
+        window: window,
+        dstX: 2,
+        dstY: 0,
+      );
+
+      int r(int x, int y) => canvas[(y * 6 + x) * 3];
+      // single coverage keeps its own tile's constant
+      expect(r(0, 1), 100);
+      expect(r(5, 1), 200);
+      // overlap: strictly between the two constants, close to the weighted mean
+      final blended = r(2, 1);
+      expect(blended, greaterThan(100));
+      expect(blended, lessThan(200));
+      // asymmetric blend: tile1 is deeper at x=2 than tile2 -> closer to 100
+      final deeper = r(2, 1);
+      final shallower = r(3, 1);
+      expect(deeper, lessThan(shallower));
+    });
+  });
 }
