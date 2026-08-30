@@ -54,6 +54,7 @@ class TfliteEngineImpl implements TfliteEngine {
       } else {
         _interpreter = await Interpreter.fromAsset(modelPath, options: options);
       }
+      _interpreter!.allocateTensors();
       _isLoaded = true;
     } catch (_) {
       _interpreter = null;
@@ -63,35 +64,35 @@ class TfliteEngineImpl implements TfliteEngine {
   }
 
   @override
-  Future<Uint8List> infer(Uint8List tileBytes) async {
-    if (!_isLoaded || _interpreter == null) {
+  Future<Float32List> infer(Float32List input) async {
+    final interpreter = _interpreter;
+    if (!_isLoaded || interpreter == null) {
       throw StateError('Engine not loaded: $_modelPath');
     }
-    // Contract: 128x128 RGB (float32 0-1) -> 512x512 RGB
-    // For scaffold, we implement a passthrough that validates shape:
-    // Real inference would allocate tensors and run.
-    // Here we do a minimal stub that still respects 4x contract for tests
-    // when interpreter is present but model is placeholder: double bytes.
-    // When interpreter is null (should not happen after successful load),
-    // fallback to stub doubling.
-    if (_interpreter == null) {
-      return Uint8List.fromList([...tileBytes, ...tileBytes]);
+
+    final inputTensor = interpreter.getInputTensor(0);
+    final outputTensor = interpreter.getOutputTensor(0);
+
+    // Raw float32 little-endian bytes. tflite_flutter passes Uint8List input
+    // through byte-for-byte (no shape resize, no per-element boxing) and
+    // copies Uint8List output back the same way — see Tensor.getInputShapeIfDifferent
+    // and ByteConversionUtils.convertObjectToBytes.
+    final inBytes =
+        Uint8List.view(input.buffer, input.offsetInBytes, input.lengthInBytes);
+    if (inBytes.length != inputTensor.data.length) {
+      throw ArgumentError(
+        'Input tensor size mismatch: Model expects '
+        '${inputTensor.data.length} bytes (shape ${inputTensor.shape}), '
+        'got ${inBytes.length} bytes (${input.length} floats).',
+      );
     }
 
-    // --- Real inference skeleton (kept minimal for Ticket 04) ---
-    // Input tensor: [1,128,128,3] float32
-    // Output tensor: [1,512,512,3] float32
-    // This code is not exercised in unit tests (stub used), but compiles
-    // and will run on device with real model.
-    final input = tileBytes; // caller prepares float32 bytes
-    final output = Uint8List(512 * 512 * 3 * 4); // float32
-    try {
-      _interpreter!.run(input, output);
-    } catch (_) {
-      // On failure, fallback to stub behavior to avoid crash in scaffold
-      return Uint8List.fromList([...tileBytes, ...tileBytes]);
-    }
-    return output;
+    final outBytes = Uint8List(outputTensor.data.length);
+    interpreter.run(inBytes, outBytes);
+
+    final out = Float32List(outBytes.length ~/ 4);
+    out.setAll(0, Float32List.view(outBytes.buffer));
+    return out;
   }
 
   @override

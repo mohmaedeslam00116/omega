@@ -2,6 +2,7 @@ import 'dart:typed_data';
 import 'package:image/image.dart' as img;
 
 import '../engine/tflite_engine.dart';
+import 'tensors.dart';
 
 class UpscalePipeline {
   final TfliteEngine engine;
@@ -17,7 +18,8 @@ class UpscalePipeline {
   });
 
   /// Highest seam: upscale imageBytes (encoded PNG/JPEG) -> upscaled bytes (PNG).
-  /// Validates 4096 limit, tiles, runs engine per tile, stitches, reports progress.
+  /// Validates 4096 limit, tiles, runs Engine per tile (Preprocess -> infer ->
+  /// Stitch), composites, reports progress.
   Future<Uint8List> upscale(
     Uint8List imageBytes, {
     void Function(double progress)? onProgress,
@@ -78,26 +80,22 @@ class UpscalePipeline {
 
         // Crop tile
         final tile = img.copyCrop(decoded, x: x, y: y, width: cw, height: ch);
-        // Encode tile to bytes for engine (stub expects raw, we pass PNG bytes)
-        final tileBytes = Uint8List.fromList(img.encodePng(tile));
 
-        // Run engine (stub doubles bytes, real would run TFLite)
-        await engine.infer(tileBytes);
+        // Preprocess: tile -> float32 NHWC tensor at the Model's input size
+        // (edge tiles are edge-replicated up to full size).
+        final input = preprocessTile(tile, inputSize: ts);
 
-        // Simulate upscaled tile: create a image of size cw*scale x ch*scale filled with tile's average color
-        // For test checker pattern, we fill with tile's top-left pixel to avoid seam logic complexity
-        final outTile = img.Image(width: cw * scale, height: ch * scale);
-        // Fill with color from original tile's center to simulate upscale
-        final sampleColor = tile.getPixel(0, 0);
-        for (int oy = 0; oy < outTile.height; oy++) {
-          for (int ox = 0; ox < outTile.width; ox++) {
-            outTile.setPixel(ox, oy, sampleColor);
-          }
-        }
+        // Engine: real Model inference (deterministic stub in tests).
+        final tensorOut = await engine.infer(input);
 
-        // Composite onto output with feather for overlap region (simplified: just copy)
-        // Overlap feather would blend 32px border; for MVP we do direct copy.
-        img.compositeImage(output, outTile, dstX: x * scale, dstY: y * scale);
+        // Stitch: tensor -> pixels; crop the valid region back out of the
+        // padded output for edge tiles, then composite onto the canvas.
+        final outTile = tileFromTensor(tensorOut, outputSize: ts * scale);
+        final cropped = (cw == ts && ch == ts)
+            ? outTile
+            : img.copyCrop(outTile,
+                x: 0, y: 0, width: cw * scale, height: ch * scale);
+        img.compositeImage(output, cropped, dstX: x * scale, dstY: y * scale);
 
         done++;
         if (onProgress != null) onProgress(done / totalTiles);

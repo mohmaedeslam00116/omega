@@ -56,8 +56,8 @@ class _FakeEngine implements TfliteEngine {
   @override
   Future<void> setUseGpu(bool v) async {}
   @override
-  Future<Uint8List> infer(Uint8List tileBytes) async =>
-      Uint8List.fromList([...tileBytes, ...tileBytes]);
+  Future<Float32List> infer(Float32List input) async =>
+      Float32List(((input.length ~/ 3) * 4 * 4) * 3);
 }
 
 class _NeverReadyEngine implements TfliteEngine {
@@ -72,8 +72,8 @@ class _NeverReadyEngine implements TfliteEngine {
   @override
   Future<void> setUseGpu(bool v) async {}
   @override
-  Future<Uint8List> infer(Uint8List tileBytes) async =>
-      Uint8List.fromList(tileBytes);
+  Future<Float32List> infer(Float32List input) async =>
+      Float32List(((input.length ~/ 3) * 4 * 4) * 3);
 }
 
 class _FakePipeline extends UpscalePipeline {

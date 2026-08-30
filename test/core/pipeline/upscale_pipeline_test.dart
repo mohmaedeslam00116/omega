@@ -7,10 +7,11 @@ import 'package:omega/core/pipeline/upscale_pipeline.dart';
 class _FakeEngine implements TfliteEngine {
   bool _loaded = true;
   bool _useGpu = false;
-  final bool Function(Uint8List tileBytes, int callIndex)? _inferHook;
+  final TfliteEngineStub _stub = TfliteEngineStub();
+  final bool Function(Float32List input, int callIndex)? _inferHook;
   int _calls = 0;
 
-  _FakeEngine({bool loaded = true, bool Function(Uint8List, int)? hook})
+  _FakeEngine({bool loaded = true, bool Function(Float32List, int)? hook})
       : _loaded = loaded,
         _inferHook = hook;
 
@@ -25,14 +26,15 @@ class _FakeEngine implements TfliteEngine {
   @override
   Future<void> setUseGpu(bool v) async => _useGpu = v;
   @override
-  Future<Uint8List> infer(Uint8List tileBytes) async {
+  Future<Float32List> infer(Float32List input) async {
     _calls++;
     if (_inferHook != null) {
-      final shouldThrow = _inferHook(tileBytes, _calls);
+      final shouldThrow = _inferHook(input, _calls);
       if (shouldThrow) throw Exception('OOM simulated');
     }
-    // Return doubled bytes to simulate 4x (stub)
-    return Uint8List.fromList([...tileBytes, ...tileBytes]);
+    // Delegate the tensor mapping to the canonical stub implementation.
+    if (!_stub.isLoaded) await _stub.load('fake-model');
+    return _stub.infer(input);
   }
 
   @override
@@ -150,6 +152,7 @@ void main() {
 class _OomFakeEngine implements TfliteEngine {
   bool _loaded = true;
   bool _useGpu = false;
+  final TfliteEngineStub _stub = TfliteEngineStub();
   bool retried = false;
   int _calls = 0;
 
@@ -162,13 +165,14 @@ class _OomFakeEngine implements TfliteEngine {
   @override
   Future<void> setUseGpu(bool v) async => _useGpu = v;
   @override
-  Future<Uint8List> infer(Uint8List tileBytes) async {
+  Future<Float32List> infer(Float32List input) async {
     _calls++;
     if (_calls == 1 && !retried) {
       retried = true;
       throw Exception('OOM simulated');
     }
-    return Uint8List.fromList([...tileBytes, ...tileBytes]);
+    if (!_stub.isLoaded) await _stub.load('fake-model');
+    return _stub.infer(input);
   }
 
   @override

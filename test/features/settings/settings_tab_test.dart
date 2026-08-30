@@ -20,7 +20,7 @@ class _FakeEngine implements TfliteEngine {
   @override
   Future<void> setUseGpu(bool v) async => useGpu = v;
   @override
-  Future<Uint8List> infer(Uint8List b) async => b;
+  Future<Float32List> infer(Float32List input) async => input;
 }
 
 class _FakeDl implements DownloadManager {
