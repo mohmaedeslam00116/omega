@@ -28,8 +28,6 @@ class TfliteEngineStub implements TfliteEngine {
   @override
   Future<void> load(String modelPath) async {
     _modelPath = modelPath;
-    // In stub, any path that exists is considered loaded. No native load.
-    await Future<void>.delayed(const Duration(milliseconds: 5));
     _loaded = true;
   }
 
@@ -41,10 +39,6 @@ class TfliteEngineStub implements TfliteEngine {
   @override
   Future<Uint8List> infer(Uint8List tileBytes) async {
     if (!_loaded) throw StateError('Engine not loaded: $_modelPath');
-    // Synthetic: return tileBytes repeated to simulate 4x area (not real image)
-    // Keep contract: 128x128 RGBA input would be 65536 bytes; we just echo.
-    // For scaffold, double length to signal upscale.
-    await Future<void>.delayed(const Duration(milliseconds: 2));
     return Uint8List.fromList([...tileBytes, ...tileBytes]);
   }
 
