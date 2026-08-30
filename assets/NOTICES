@@ -1,0 +1,10 @@
+Omega NOTICES
+
+Real-ESRGAN (c) 2021 Xintao Wang — BSD-3-Clause
+https://github.com/xinntao/Real-ESRGAN/blob/master/LICENSE
+
+ESRGAN (c) Xintao Wang — Apache-2.0
+
+TFLite Flutter plugin — Apache-2.0
+
+This app bundles realesr-general-x4v3 FP16 (BSD-3) as default. See CatalogEntry.license for per-model license.
