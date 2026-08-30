@@ -19,7 +19,7 @@
 
 ```bash
 # 1. استنساخ المشروع
-git clone https://github.com/Mohamedeslamkg/omega.git
+git clone https://github.com/mohmaedeslam00116/omega.git
 cd omega
 
 # 2. تثبيت الأدوات (Node 18+)
