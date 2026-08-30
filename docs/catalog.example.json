@@ -1,28 +1,28 @@
 [
   {
     "id": "realesr-general-x4v3",
-    "name": "General Photo 4x",
     "scale": 4,
     "type": "general",
-    "inputSize": 128,
-    "fileSize": 3670016,
-    "sha256": "e614f430e100a1c0b1a2e3d4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5",
     "url": "https://github.com/mohmaedeslam00116/omega-models/releases/download/v1.0.0/realesr-general-x4v3_fp16.tflite",
-    "license": "BSD-3-Clause",
+    "name": "General Photo 4×",
+    "bundled": true,
+    "fileSize": 3549456,
+    "sha256": "6d597b46d812ada42bdde641ec6e78c0ef0b78ff5a825fcfd74b9a1b3bcbe9a4",
+    "inputSize": 128,
     "version": "1.0.0",
-    "bundled": true
+    "license": "BSD-3-Clause"
   },
   {
     "id": "realesr-x4plus",
-    "name": "High Quality 4x",
     "scale": 4,
     "type": "general",
-    "inputSize": 128,
-    "fileSize": 16777216,
-    "sha256": "7f954497b9a1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5",
     "url": "https://github.com/mohmaedeslam00116/omega-models/releases/download/v1.0.0/realesr-x4plus_w8a8.tflite",
-    "license": "BSD-3-Clause",
+    "name": "High Quality 4×",
+    "bundled": false,
+    "fileSize": 3549456,
+    "sha256": "6d597b46d812ada42bdde641ec6e78c0ef0b78ff5a825fcfd74b9a1b3bcbe9a4",
+    "inputSize": 128,
     "version": "1.0.0",
-    "bundled": false
+    "license": "BSD-3-Clause"
   }
 ]
