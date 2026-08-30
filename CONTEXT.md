@@ -36,6 +36,18 @@ _Avoid_: model info, catalog item
 The process of fetching a CatalogEntry's Model to local storage with verification and caching.
 _Avoid_: fetch, pull
 
+### Preprocess
+Turning a source Tile into the float32 tensor an Engine consumes (normalize 0..1 + RGB layout) before inference.
+_Avoid_: normalize step, input preparation
+
+### Stitch
+Compositing the upscaled Tiles into the final image, feathering overlapping borders so no seams show.
+_Avoid_: glue, mosaic, paste
+
+### UpscaleJob
+A single, cancellable upscale operation with progress reporting, executed in a background Isolate.
+_Avoid_: upscale task, job queue
+
 ## Notes
-- Scope: Round 3 settled — Download manager with resume + SHA256 verify + delete/clear cache, two-tab UI (Upscale/Catalog) with `impeccable` design tokens, scoped permissions + GPU toggle + cache limit, OOM graceful handling (down-tiling + retry). Tree closed.
+- Scope: Round 4 settled — Real inference end-to-end (engine contract Float32List), full pipeline in a fresh Isolate per UpscaleJob, seam-free Stitch with blended overlap, 512MB pre-flight memory guard, cancel button, Model picker in Upscale tab (bundled + downloaded, auto-download), PNG/JPEG save sheet (preference remembered), remove scaffold button. Tree closed.
 - Design: `impeccable` UI — distinctive, intentional, not templated; use design tokens, typography, and icon system.
