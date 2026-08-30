@@ -148,6 +148,8 @@ void main() {
 
     expect(find.text('No image selected'), findsOneWidget);
     expect(find.text('Gallery'), findsOneWidget);
+    // Round 4 UX polish: no debug scaffolding on the upscaling surface.
+    expect(find.text('Verify bundled Model'), findsNothing);
 
     // Tap Gallery
     await tester.tap(find.text('Gallery'));
@@ -518,6 +520,10 @@ void main() {
     await tester.tap(find.text('Save image'));
     await tester.pumpAndSettle();
     expect(fakeIo.saveCalled, true);
+
+    // Let the "Saved" SnackBar auto-dismiss — it docks over the Share button.
+    await tester.pump(const Duration(seconds: 4));
+    await tester.pumpAndSettle();
 
     await tester.tap(find.text('Share'));
     await tester.pumpAndSettle();

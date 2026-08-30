@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:omega/main.dart';
 
@@ -29,7 +30,10 @@ void main() {
 
   testWidgets('Bundled asset is declared and loadable', (tester) async {
     await tester.pumpWidget(const OmegaApp());
-    // The Upscale tab has a button to verify bundled model
-    expect(find.text('Verify bundled Model'), findsOneWidget);
+    // The bundled Model ships as a declared asset — loadable directly,
+    // no debug UI required to prove it.
+    final data = await rootBundle
+        .load('assets/models/realesr-general-x4v3_fp16.tflite');
+    expect(data.lengthInBytes, greaterThan(0));
   });
 }

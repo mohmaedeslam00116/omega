@@ -1,5 +1,6 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 
 import '../../core/catalog/catalog_entry.dart';
@@ -461,24 +462,7 @@ class _UpscaleTabState extends State<UpscaleTab> {
                   ),
                 ],
               ),
-            // Keep scaffold verify for backward compat
-            const SizedBox(height: 8),
-            TextButton.icon(
-              onPressed: () async {
-                try {
-                  final data = await rootBundle.load('assets/models/realesr-general-x4v3_fp16.tflite');
-                  if (!context.mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Bundled Model ready • ${data.lengthInBytes} bytes')),
-                  );
-                } catch (e) {
-                  if (!context.mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Asset missing: $e')));
-                }
-              },
-              icon: const Icon(Icons.verified_outlined, size: 16),
-              label: const Text('Verify bundled Model', style: TextStyle(fontSize: 11)),
-            ),
+
           ],
         ),
       ),
