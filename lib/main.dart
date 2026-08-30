@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'core/theme/app_theme.dart';
-import 'features/upscale/upscale_tab.dart';
 import 'features/catalog/catalog_tab.dart';
+import 'features/settings/settings_tab.dart';
+import 'features/upscale/upscale_tab.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -35,6 +36,7 @@ class _RootShellState extends State<RootShell> {
   static const _tabs = [
     UpscaleTab(),
     CatalogTab(),
+    SettingsTab(),
   ];
 
   @override
@@ -64,6 +66,11 @@ class _RootShellState extends State<RootShell> {
             icon: Icon(Icons.layers_outlined),
             selectedIcon: Icon(Icons.layers),
             label: 'Catalog',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.settings_outlined),
+            selectedIcon: Icon(Icons.settings),
+            label: 'Settings',
           ),
         ],
       ),
