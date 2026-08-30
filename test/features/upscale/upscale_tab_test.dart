@@ -1,9 +1,12 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
+import 'package:omega/core/catalog/catalog_entry.dart';
+import 'package:omega/core/download/download_manager.dart';
 import 'package:omega/core/image/image_io_service.dart';
 import 'package:omega/core/pipeline/upscale_job_runner.dart';
 import 'package:omega/core/pipeline/upscale_pipeline.dart';
@@ -13,6 +16,55 @@ Uint8List _png(int w, int h) {
   final im = img.Image(width: w, height: h);
   img.fill(im, color: img.ColorRgb8(50, 100, 150));
   return Uint8List.fromList(img.encodePng(im));
+}
+
+CatalogEntry _entry(String id, {bool bundled = false}) => CatalogEntry(
+      id: id,
+      name: bundled ? 'Bundled Model' : 'Extra Model',
+      scale: 4,
+      type: ModelType.general,
+      inputSize: 128,
+      fileSize: 10,
+      sha256: 'abc',
+      url: 'https://example.com/$id.tflite',
+      license: 'BSD-3-Clause',
+      version: '1.0.0',
+      bundled: bundled,
+    );
+
+class _FakeDownloadManager implements DownloadManager {
+  final Set<String> downloaded;
+  final List<CatalogEntry> downloadCalls = [];
+  Completer<void>? gate;
+  _FakeDownloadManager({required this.downloaded, this.gate});
+
+  @override
+  Future<File> download(CatalogEntry entry,
+      {void Function(double progress)? onProgress,
+      bool Function()? isCancelled}) async {
+    downloadCalls.add(entry);
+    onProgress?.call(0.5);
+    final g = gate;
+    if (g != null) await g.future;
+    downloaded.add(entry.id);
+    return File('fake-${entry.id}');
+  }
+
+  @override
+  Future<bool> isDownloaded(String id) async => downloaded.contains(id);
+
+  @override
+  Future<String> pathFor(CatalogEntry entry) async =>
+      '/cache/models/${entry.id}.tflite';
+
+  @override
+  Future<void> delete(String id) async => downloaded.remove(id);
+
+  @override
+  Future<void> clearCache() async => downloaded.clear();
+
+  @override
+  Future<int> getCacheSize() async => 0;
 }
 
 class _FakeImageIo implements ImageIoService {
@@ -80,7 +132,7 @@ void main() {
 
     await tester.pumpWidget(MaterialApp(
       home: Scaffold(
-        body: UpscaleTab(imageIo: fakeIo, runner: runner),
+        body: UpscaleTab(imageIo: fakeIo, runner: runner, downloadManager: _FakeDownloadManager(downloaded: {})),
       ),
     ));
 
@@ -93,30 +145,128 @@ void main() {
     expect(find.byType(Image), findsWidgets);
   });
 
-  testWidgets('Upscale button disabled if Model not ready', (tester) async {
-    final bytes = _png(50, 50);
-    final fakeIo = _FakeImageIo(bytes);
+  testWidgets('Upscale disabled while the selected Model downloads',
+      (tester) async {
+    final gate = Completer<void>();
+    final fakeIo = _FakeImageIo(_png(64, 64));
+    final dl = _FakeDownloadManager(downloaded: {}, gate: gate);
     final runner = _FakeRunner((img, config, p, token) async => _png(200, 200));
+    final catalog = [
+      _entry('bundled-model', bundled: true),
+      _entry('extra-model'),
+    ];
 
     await tester.pumpWidget(MaterialApp(
       home: Scaffold(
         body: UpscaleTab(
           imageIo: fakeIo,
           runner: runner,
-          modelPath: 'assets/models/missing.tflite',
+          downloadManager: dl,
+          catalog: catalog,
         ),
       ),
     ));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 50));
+    await tester.pumpAndSettle();
 
     await tester.tap(find.text('Gallery'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pumpAndSettle();
 
+    await tester.tap(find.byType(DropdownButton<CatalogEntry>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.textContaining('Extra Model').last);
+    await tester.pump();
+
+    // Download is gated open -> still in progress, button disabled.
     final btn = tester
         .widget<FilledButton>(find.widgetWithText(FilledButton, 'Upscale 4×'));
     expect(btn.onPressed, isNull);
+
+    gate.complete();
+    await tester.pumpAndSettle();
+    final btn2 = tester
+        .widget<FilledButton>(find.widgetWithText(FilledButton, 'Upscale 4×'));
+    expect(btn2.onPressed, isNotNull);
+  });
+
+  testWidgets('Model selection drives the job modelPath (downloaded Model)',
+      (tester) async {
+    final fakeIo = _FakeImageIo(_png(64, 64));
+    final dl = _FakeDownloadManager(downloaded: {'extra-model'});
+    final runner = _FakeRunner((img, config, prog, token) async {
+      prog?.call(1.0);
+      return _png(256, 256);
+    });
+    final catalog = [
+      _entry('bundled-model', bundled: true),
+      _entry('extra-model'),
+    ];
+
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: UpscaleTab(
+          imageIo: fakeIo,
+          runner: runner,
+          downloadManager: dl,
+          catalog: catalog,
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Gallery'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byType(DropdownButton<CatalogEntry>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.textContaining('Extra Model').last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Upscale 4×'));
+    await tester.pumpAndSettle();
+
+    expect(runner.lastConfig?.modelPath, '/cache/models/extra-model.tflite');
+  });
+
+  testWidgets('Selecting a missing Model auto-downloads it with progress',
+      (tester) async {
+    final fakeIo = _FakeImageIo(_png(64, 64));
+    final dl = _FakeDownloadManager(downloaded: {});
+    final runner = _FakeRunner((img, config, prog, token) async {
+      prog?.call(1.0);
+      return _png(256, 256);
+    });
+    final catalog = [
+      _entry('bundled-model', bundled: true),
+      _entry('extra-model'),
+    ];
+
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: UpscaleTab(
+          imageIo: fakeIo,
+          runner: runner,
+          downloadManager: dl,
+          catalog: catalog,
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Gallery'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byType(DropdownButton<CatalogEntry>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.textContaining('Extra Model').last);
+    await tester.pump();
+
+    expect(dl.downloadCalls.map((e) => e.id), contains('extra-model'));
+
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Upscale 4×'));
+    await tester.pumpAndSettle();
+
+    expect(runner.lastConfig?.modelPath, '/cache/models/extra-model.tflite');
   });
 
   testWidgets('Progress advances, Cancel appears, job completes',
@@ -132,7 +282,7 @@ void main() {
     });
 
     await tester.pumpWidget(MaterialApp(
-      home: Scaffold(body: UpscaleTab(imageIo: fakeIo, runner: runner)),
+      home: Scaffold(body: UpscaleTab(imageIo: fakeIo, runner: runner, downloadManager: _FakeDownloadManager(downloaded: {}))),
     ));
     await tester.tap(find.text('Gallery'));
     await tester.pumpAndSettle();
@@ -158,7 +308,7 @@ void main() {
     });
 
     await tester.pumpWidget(MaterialApp(
-      home: Scaffold(body: UpscaleTab(imageIo: fakeIo, runner: runner)),
+      home: Scaffold(body: UpscaleTab(imageIo: fakeIo, runner: runner, downloadManager: _FakeDownloadManager(downloaded: {}))),
     ));
     await tester.tap(find.text('Gallery'));
     await tester.pumpAndSettle();
@@ -185,7 +335,7 @@ void main() {
 
     await tester.pumpWidget(MaterialApp(
       home: Scaffold(
-        body: UpscaleTab(imageIo: fakeIo, runner: runner, useGpu: true),
+        body: UpscaleTab(imageIo: fakeIo, runner: runner, downloadManager: _FakeDownloadManager(downloaded: {}), useGpu: true),
       ),
     ));
     await tester.tap(find.text('Gallery'));
@@ -208,7 +358,7 @@ void main() {
     });
 
     await tester.pumpWidget(MaterialApp(
-      home: Scaffold(body: UpscaleTab(imageIo: fakeIo, runner: runner)),
+      home: Scaffold(body: UpscaleTab(imageIo: fakeIo, runner: runner, downloadManager: _FakeDownloadManager(downloaded: {}))),
     ));
     await tester.tap(find.text('Gallery'));
     await tester.pumpAndSettle();
@@ -244,7 +394,7 @@ void main() {
     });
 
     await tester.pumpWidget(MaterialApp(
-      home: Scaffold(body: UpscaleTab(imageIo: fakeIo, runner: runner)),
+      home: Scaffold(body: UpscaleTab(imageIo: fakeIo, runner: runner, downloadManager: _FakeDownloadManager(downloaded: {}))),
     ));
     await tester.tap(find.text('Gallery'));
     await tester.pumpAndSettle();

@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:omega/core/catalog/catalog_entry.dart';
 import 'package:omega/core/download/download_manager.dart';
 import 'package:omega/core/engine/tflite_engine.dart';
 import 'package:omega/core/settings/settings_service.dart';
@@ -37,6 +38,9 @@ class _FakeDl implements DownloadManager {
   Future<int> getCacheSize() async => size;
   @override
   Future<bool> isDownloaded(String id) async => false;
+
+  @override
+  Future<String> pathFor(CatalogEntry entry) async => 'fake/${entry.id}.tflite';
 }
 
 void main() {

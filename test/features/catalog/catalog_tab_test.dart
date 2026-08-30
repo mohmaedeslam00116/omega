@@ -61,6 +61,10 @@ class _FakeDownloadManager implements DownloadManager {
 
   @override
   Future<bool> isDownloaded(String id) async => downloaded.contains(id);
+
+  @override
+  Future<String> pathFor(CatalogEntry entry) async =>
+      '${tmp.path}/models/${entry.id}.tflite';
 }
 
 List<CatalogEntry> _exampleEntries() => [

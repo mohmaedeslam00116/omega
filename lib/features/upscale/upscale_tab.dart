@@ -1,9 +1,9 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:http/http.dart' as http;
 
 import '../../core/catalog/catalog_entry.dart';
+import '../../core/download/download_manager.dart';
 import '../../core/image/image_io_service.dart';
 import '../../core/pipeline/upscale_job_runner.dart';
 import '../../core/pipeline/upscale_pipeline.dart';
@@ -11,7 +11,7 @@ import '../../core/pipeline/upscale_pipeline.dart';
 class UpscaleTab extends StatefulWidget {
   final ImageIoService? imageIo;
   final UpscaleJobRunner? runner;
-  final String? modelPath;
+  final DownloadManager? downloadManager;
   final bool useGpu;
   final List<CatalogEntry>? catalog;
 
@@ -19,7 +19,7 @@ class UpscaleTab extends StatefulWidget {
     super.key,
     this.imageIo,
     this.runner,
-    this.modelPath,
+    this.downloadManager,
     this.useGpu = false,
     this.catalog,
   });
@@ -29,34 +29,36 @@ class UpscaleTab extends StatefulWidget {
 }
 
 class _UpscaleTabState extends State<UpscaleTab> {
-  static const _defaultModelPath =
-      'assets/models/realesr-general-x4v3_fp16.tflite';
-
   late final ImageIoService _imageIo;
   late final UpscaleJobRunner _runner;
-  late final String _modelPath;
+  late final DownloadManager _downloadManager;
   late List<CatalogEntry> _catalog;
 
   Uint8List? _inputBytes;
   Uint8List? _outputBytes;
   bool _isProcessing = false;
-  bool _modelReady = false;
   double _progress = 0;
   String? _error;
   double _slider = 0.5;
   CatalogEntry? _selected;
   CancelToken? _activeToken;
 
+  /// CatalogEntry ids available locally: bundled always, Downloaded on demand.
+  final Set<String> _downloadedIds = {};
+  String? _downloadingId;
+  double? _downloadProgress;
+
   @override
   void initState() {
     super.initState();
     _imageIo = widget.imageIo ?? ImageIoServiceImpl();
     _runner = widget.runner ?? IsolateUpscaleJobRunner();
-    _modelPath = widget.modelPath ?? _defaultModelPath;
+    _downloadManager =
+        widget.downloadManager ?? DownloadManagerImpl(client: http.Client());
     _catalog = widget.catalog ?? _defaultCatalog;
     _selected =
         _catalog.firstWhere((e) => e.bundled, orElse: () => _catalog.first);
-    _checkModelReady();
+    _refreshDownloadedIds();
   }
 
   static final List<CatalogEntry> _defaultCatalog = [
@@ -88,16 +90,58 @@ class _UpscaleTabState extends State<UpscaleTab> {
     ),
   ];
 
-  Future<void> _checkModelReady() async {
+  /// Bundled Models ship at `assets/models/<id>_fp16.tflite` (ADR-0004
+  /// convention; matches the bundled CatalogEntry ids).
+  static String _bundledAssetPath(CatalogEntry entry) =>
+      'assets/models/${entry.id}_fp16.tflite';
+
+  /// The selected Model is ready when bundled or already Downloaded.
+  bool get _modelReady {
+    final entry = _selected;
+    if (entry == null) return false;
+    return entry.bundled || _downloadedIds.contains(entry.id);
+  }
+
+  void _refreshDownloadedIds() {
+    for (final e in _catalog.where((e) => !e.bundled)) {
+      _downloadManager.isDownloaded(e.id).then((ok) {
+        if (ok && mounted && !_downloadedIds.contains(e.id)) {
+          setState(() => _downloadedIds.add(e.id));
+        }
+      }).catchError((_) {});
+    }
+  }
+
+  Future<void> _onModelSelected(CatalogEntry? entry) async {
+    if (entry == null || identical(entry, _selected)) return;
+    if (_downloadingId != null) return; // one Download at a time
+    final previous = _selected;
+    setState(() => _selected = entry);
+    if (entry.bundled || _downloadedIds.contains(entry.id)) return;
+
+    setState(() {
+      _downloadingId = entry.id;
+      _downloadProgress = 0;
+    });
     try {
-      if (_modelPath.startsWith('assets/')) {
-        await rootBundle.load(_modelPath);
-      } else if (!File(_modelPath).existsSync()) {
-        throw StateError('Model file missing: $_modelPath');
-      }
-      if (mounted) setState(() => _modelReady = true);
-    } catch (_) {
-      if (mounted) setState(() => _modelReady = false);
+      await _downloadManager.download(entry, onProgress: (p) {
+        if (mounted) setState(() => _downloadProgress = p);
+      });
+      if (!mounted) return;
+      setState(() {
+        _downloadedIds.add(entry.id);
+        _downloadingId = null;
+        _downloadProgress = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _selected = previous; // revert to the last usable Model
+        _downloadingId = null;
+        _downloadProgress = null;
+      });
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Download failed: $e')));
     }
   }
 
@@ -139,7 +183,8 @@ class _UpscaleTabState extends State<UpscaleTab> {
 
   Future<void> _upscale() async {
     if (_inputBytes == null || _isProcessing) return;
-    if (!_modelReady) {
+    final entry = _selected;
+    if (entry == null || !_modelReady) {
       setState(() => _error = 'Model not ready');
       return;
     }
@@ -151,9 +196,12 @@ class _UpscaleTabState extends State<UpscaleTab> {
       _activeToken = token;
     });
     try {
+      final modelPath = entry.bundled
+          ? _bundledAssetPath(entry)
+          : await _downloadManager.pathFor(entry);
       final out = await _runner.run(
         _inputBytes!,
-        config: UpscaleJobConfig(modelPath: _modelPath, useGpu: widget.useGpu),
+        config: UpscaleJobConfig(modelPath: modelPath, useGpu: widget.useGpu),
         onProgress: (p) {
           if (mounted) setState(() => _progress = p);
         },
@@ -268,17 +316,21 @@ class _UpscaleTabState extends State<UpscaleTab> {
                     items: _catalog
                         .map((e) => DropdownMenuItem(
                               value: e,
-                              child: Text('${e.name} ${e.bundled ? "• Bundled" : ""}',
+                              child: Text('${e.name}${e.bundled ? " • Bundled" : ""}',
                                   style: theme.textTheme.bodyMedium?.copyWith(fontSize: 12)),
                             ))
                         .toList(),
-                    onChanged: (v) => setState(() => _selected = v),
+                    onChanged: (v) => _onModelSelected(v),
                   ),
                 ),
-                if (!_modelReady)
-                  const Padding(
-                    padding: EdgeInsets.only(left: 8),
-                    child: SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2)),
+                if (_downloadingId != null)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 8),
+                    child: SizedBox(
+                        width: 12,
+                        height: 12,
+                        child: CircularProgressIndicator(
+                            value: _downloadProgress, strokeWidth: 2)),
                   ),
               ],
             ),

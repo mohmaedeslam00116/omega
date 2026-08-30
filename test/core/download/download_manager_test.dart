@@ -41,6 +41,17 @@ void main() {
   });
 
   group('DownloadManager', () {
+    test('pathFor returns the local models/<id>.tflite path', () async {
+      final entry = _entryForContent('path-test', 'x');
+      final mgr = DownloadManagerImpl(
+        client: http.Client(),
+        getCacheDirOverride: () async => tmp,
+      );
+      final path = await mgr.pathFor(entry);
+      expect(path, endsWith('models/path-test.tflite'));
+      expect(path.startsWith(tmp.path), true);
+    });
+
     test('Download shows 0..1 progress and supports cancel', () async {
       const content = 'hello world content for progress';
       final entry = _entryForContent('a', content);

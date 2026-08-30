@@ -18,6 +18,11 @@ abstract class DownloadManager {
     void Function(double progress)? onProgress,
     bool Function()? isCancelled,
   });
+
+  /// Local file path where this CatalogEntry's Model lives once Downloaded
+  /// (the Upscale job loads it inside its worker Isolate).
+  Future<String> pathFor(CatalogEntry entry);
+
   Future<void> delete(String id);
   Future<void> clearCache();
   Future<int> getCacheSize();
@@ -216,5 +221,11 @@ class DownloadManagerImpl implements DownloadManager {
     final base = await _getCacheDir();
     final file = _fileFor(base, id);
     return file.exists();
+  }
+
+  @override
+  Future<String> pathFor(CatalogEntry entry) async {
+    final base = await _getCacheDir();
+    return _fileFor(base, entry.id).path;
   }
 }
