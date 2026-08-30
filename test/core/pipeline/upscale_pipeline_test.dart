@@ -183,6 +183,21 @@ void main() {
       );
     });
 
+    test('isCancelled between tiles aborts the job cleanly', () async {
+      final engine = _FakeEngine();
+      final pipeline = UpscalePipeline(engine: engine);
+      final input = _makePng(256, 256, fill: img.ColorRgb8(50, 50, 50));
+
+      var checks = 0;
+      // 9 tiles (3x3 clamped grid): cancel flips true on the 4th check, so
+      // exactly 3 tiles get processed before the abort.
+      await expectLater(
+        pipeline.upscale(input, isCancelled: () => ++checks > 3),
+        throwsA(isA<UpscaleCancelledException>()),
+      );
+      expect(engine.calls, 3);
+    });
+
     test('Image exceeds 4096 throws', () async {
       final engine = _FakeEngine();
       final pipeline = UpscalePipeline(engine: engine);

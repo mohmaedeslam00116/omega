@@ -1,22 +1,26 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/catalog/catalog_entry.dart';
-import '../../core/engine/tflite_engine.dart';
 import '../../core/image/image_io_service.dart';
+import '../../core/pipeline/upscale_job_runner.dart';
 import '../../core/pipeline/upscale_pipeline.dart';
 
 class UpscaleTab extends StatefulWidget {
   final ImageIoService? imageIo;
-  final UpscalePipeline? pipeline;
-  final TfliteEngine? engine;
+  final UpscaleJobRunner? runner;
+  final String? modelPath;
+  final bool useGpu;
   final List<CatalogEntry>? catalog;
 
   const UpscaleTab({
     super.key,
     this.imageIo,
-    this.pipeline,
-    this.engine,
+    this.runner,
+    this.modelPath,
+    this.useGpu = false,
     this.catalog,
   });
 
@@ -25,30 +29,34 @@ class UpscaleTab extends StatefulWidget {
 }
 
 class _UpscaleTabState extends State<UpscaleTab> {
+  static const _defaultModelPath =
+      'assets/models/realesr-general-x4v3_fp16.tflite';
+
   late final ImageIoService _imageIo;
-  late final TfliteEngine _engine;
-  late final UpscalePipeline _pipeline;
+  late final UpscaleJobRunner _runner;
+  late final String _modelPath;
   late List<CatalogEntry> _catalog;
 
   Uint8List? _inputBytes;
   Uint8List? _outputBytes;
   bool _isProcessing = false;
+  bool _modelReady = false;
   double _progress = 0;
   String? _error;
   double _slider = 0.5;
   CatalogEntry? _selected;
-
-  bool _engineReady = false;
+  CancelToken? _activeToken;
 
   @override
   void initState() {
     super.initState();
     _imageIo = widget.imageIo ?? ImageIoServiceImpl();
-    _engine = widget.engine ?? TfliteEngineStub();
-    _pipeline = widget.pipeline ?? UpscalePipeline(engine: _engine);
+    _runner = widget.runner ?? IsolateUpscaleJobRunner();
+    _modelPath = widget.modelPath ?? _defaultModelPath;
     _catalog = widget.catalog ?? _defaultCatalog;
-    _selected = _catalog.firstWhere((e) => e.bundled, orElse: () => _catalog.first);
-    _initEngine();
+    _selected =
+        _catalog.firstWhere((e) => e.bundled, orElse: () => _catalog.first);
+    _checkModelReady();
   }
 
   static final List<CatalogEntry> _defaultCatalog = [
@@ -80,12 +88,16 @@ class _UpscaleTabState extends State<UpscaleTab> {
     ),
   ];
 
-  Future<void> _initEngine() async {
+  Future<void> _checkModelReady() async {
     try {
-      await _engine.load('assets/models/realesr-general-x4v3_fp16.tflite');
-      if (mounted) setState(() => _engineReady = _engine.isLoaded);
+      if (_modelPath.startsWith('assets/')) {
+        await rootBundle.load(_modelPath);
+      } else if (!File(_modelPath).existsSync()) {
+        throw StateError('Model file missing: $_modelPath');
+      }
+      if (mounted) setState(() => _modelReady = true);
     } catch (_) {
-      if (mounted) setState(() => _engineReady = false);
+      if (mounted) setState(() => _modelReady = false);
     }
   }
 
@@ -126,22 +138,26 @@ class _UpscaleTabState extends State<UpscaleTab> {
   }
 
   Future<void> _upscale() async {
-    if (_inputBytes == null) return;
-    if (!_engineReady) {
+    if (_inputBytes == null || _isProcessing) return;
+    if (!_modelReady) {
       setState(() => _error = 'Model not ready');
       return;
     }
+    final token = CancelToken();
     setState(() {
       _isProcessing = true;
       _progress = 0;
       _error = null;
+      _activeToken = token;
     });
     try {
-      final out = await _pipeline.upscale(
+      final out = await _runner.run(
         _inputBytes!,
+        config: UpscaleJobConfig(modelPath: _modelPath, useGpu: widget.useGpu),
         onProgress: (p) {
           if (mounted) setState(() => _progress = p);
         },
+        cancelToken: token,
       );
       if (mounted) {
         setState(() {
@@ -149,6 +165,9 @@ class _UpscaleTabState extends State<UpscaleTab> {
           _isProcessing = false;
         });
       }
+    } on UpscaleCancelledException {
+      // Cancelled from the UI — quietly return to the preview state.
+      if (mounted) setState(() => _isProcessing = false);
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -157,8 +176,12 @@ class _UpscaleTabState extends State<UpscaleTab> {
       });
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(e.toString())));
+    } finally {
+      _activeToken = null;
     }
   }
+
+  void _cancelUpscale() => _activeToken?.cancel();
 
   Future<void> _save() async {
     if (_outputBytes == null) return;
@@ -252,7 +275,7 @@ class _UpscaleTabState extends State<UpscaleTab> {
                     onChanged: (v) => setState(() => _selected = v),
                   ),
                 ),
-                if (!_engineReady)
+                if (!_modelReady)
                   const Padding(
                     padding: EdgeInsets.only(left: 8),
                     child: SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2)),
@@ -312,12 +335,31 @@ class _UpscaleTabState extends State<UpscaleTab> {
                 ],
               )
             else if (_outputBytes == null)
-              FilledButton.icon(
-                onPressed: (!_engineReady || _isProcessing) ? null : _upscale,
-                icon: _isProcessing
-                    ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : const Icon(Icons.auto_awesome, size: 18),
-                label: Text(_isProcessing ? 'Upscaling...' : 'Upscale 4×'),
+              Row(
+                children: [
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed:
+                          (!_modelReady || _isProcessing) ? null : _upscale,
+                      icon: _isProcessing
+                          ? const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: Colors.white))
+                          : const Icon(Icons.auto_awesome, size: 18),
+                      label: Text(_isProcessing ? 'Upscaling...' : 'Upscale 4×'),
+                    ),
+                  ),
+                  if (_isProcessing) ...[
+                    const SizedBox(width: 10),
+                    OutlinedButton.icon(
+                      onPressed: _cancelUpscale,
+                      icon: const Icon(Icons.cancel_outlined, size: 18),
+                      label: const Text('Cancel'),
+                    ),
+                  ],
+                ],
               )
             else
               Row(

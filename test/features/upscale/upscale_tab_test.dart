@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
-import 'package:omega/core/engine/tflite_engine.dart';
 import 'package:omega/core/image/image_io_service.dart';
+import 'package:omega/core/pipeline/upscale_job_runner.dart';
 import 'package:omega/core/pipeline/upscale_pipeline.dart';
 import 'package:omega/features/upscale/upscale_tab.dart';
 
@@ -30,7 +32,7 @@ class _FakeImageIo implements ImageIoService {
   Future<void> validate(Uint8List bytes) async {}
   @override
   Future<String> saveToGallery(Uint8List bytes,
-          {String filename = 'a.png', bool asJpeg = false}) async {
+      {String filename = 'a.png', bool asJpeg = false}) async {
     saveCalled = true;
     return 'gallery:$filename';
   }
@@ -42,48 +44,27 @@ class _FakeImageIo implements ImageIoService {
   }
 }
 
-class _FakeEngine implements TfliteEngine {
-  bool _loaded = true;
-  @override
-  bool get isLoaded => _loaded;
-  @override
-  bool get useGpu => false;
-  void setLoaded(bool v) => _loaded = v;
-  @override
-  Future<void> close() async => _loaded = false;
-  @override
-  Future<void> load(String p) async => _loaded = true;
-  @override
-  Future<void> setUseGpu(bool v) async {}
-  @override
-  Future<Float32List> infer(Float32List input) async =>
-      Float32List(((input.length ~/ 3) * 4 * 4) * 3);
-}
-
-class _NeverReadyEngine implements TfliteEngine {
-  @override
-  bool get isLoaded => false;
-  @override
-  bool get useGpu => false;
-  @override
-  Future<void> close() async {}
-  @override
-  Future<void> load(String p) async {}
-  @override
-  Future<void> setUseGpu(bool v) async {}
-  @override
-  Future<Float32List> infer(Float32List input) async =>
-      Float32List(((input.length ~/ 3) * 4 * 4) * 3);
-}
-
-class _FakePipeline extends UpscalePipeline {
-  final Future<Uint8List> Function(Uint8List, void Function(double)?) _fn;
-  _FakePipeline(this._fn) : super(engine: _FakeEngine());
+class _FakeRunner implements UpscaleJobRunner {
+  final Future<Uint8List> Function(
+    Uint8List bytes,
+    UpscaleJobConfig config,
+    void Function(double)? onProgress,
+    CancelToken? token,
+  ) _fn;
+  CancelToken? lastToken;
+  UpscaleJobConfig? lastConfig;
+  _FakeRunner(this._fn);
 
   @override
-  Future<Uint8List> upscale(Uint8List imageBytes,
-      {void Function(double progress)? onProgress}) {
-    return _fn(imageBytes, onProgress);
+  Future<Uint8List> run(
+    Uint8List imageBytes, {
+    required UpscaleJobConfig config,
+    void Function(double progress)? onProgress,
+    CancelToken? cancelToken,
+  }) async {
+    lastToken = cancelToken;
+    lastConfig = config;
+    return _fn(imageBytes, config, onProgress, cancelToken);
   }
 }
 
@@ -92,18 +73,14 @@ void main() {
       (tester) async {
     final bytes = _png(100, 100);
     final fakeIo = _FakeImageIo(bytes);
-    final fakePipeline = _FakePipeline((img, prog) async {
+    final runner = _FakeRunner((img, config, prog, token) async {
       prog?.call(1.0);
       return _png(400, 400);
     });
 
     await tester.pumpWidget(MaterialApp(
       home: Scaffold(
-        body: UpscaleTab(
-          imageIo: fakeIo,
-          pipeline: fakePipeline,
-          engine: _FakeEngine(),
-        ),
+        body: UpscaleTab(imageIo: fakeIo, runner: runner),
       ),
     ));
 
@@ -116,18 +93,17 @@ void main() {
     expect(find.byType(Image), findsWidgets);
   });
 
-  testWidgets('Upscale button disabled if engine not ready', (tester) async {
+  testWidgets('Upscale button disabled if Model not ready', (tester) async {
     final bytes = _png(50, 50);
     final fakeIo = _FakeImageIo(bytes);
-    final engineNotReady = _NeverReadyEngine();
-    final pipeline = _FakePipeline((img, p) async => _png(200, 200));
+    final runner = _FakeRunner((img, config, p, token) async => _png(200, 200));
 
     await tester.pumpWidget(MaterialApp(
       home: Scaffold(
         body: UpscaleTab(
           imageIo: fakeIo,
-          pipeline: pipeline,
-          engine: engineNotReady,
+          runner: runner,
+          modelPath: 'assets/models/missing.tflite',
         ),
       ),
     ));
@@ -138,14 +114,16 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 
-    final btn = tester.widget<FilledButton>(find.widgetWithText(FilledButton, 'Upscale 4×'));
+    final btn = tester
+        .widget<FilledButton>(find.widgetWithText(FilledButton, 'Upscale 4×'));
     expect(btn.onPressed, isNull);
   });
 
-  testWidgets('Progress bar advances; UI remains responsive', (tester) async {
+  testWidgets('Progress advances, Cancel appears, job completes',
+      (tester) async {
     final bytes = _png(128, 128);
     final fakeIo = _FakeImageIo(bytes);
-    final pipeline = _FakePipeline((img, prog) async {
+    final runner = _FakeRunner((img, config, prog, token) async {
       for (var i = 1; i <= 4; i++) {
         await Future<void>.delayed(const Duration(milliseconds: 10));
         prog?.call(i / 4);
@@ -154,30 +132,86 @@ void main() {
     });
 
     await tester.pumpWidget(MaterialApp(
-      home: Scaffold(body: UpscaleTab(imageIo: fakeIo, pipeline: pipeline)),
+      home: Scaffold(body: UpscaleTab(imageIo: fakeIo, runner: runner)),
     ));
     await tester.tap(find.text('Gallery'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Upscale 4×'));
     await tester.pump();
     expect(find.byType(LinearProgressIndicator), findsOneWidget);
+    expect(find.text('Cancel'), findsOneWidget);
     // Let it complete
     await tester.pumpAndSettle();
     expect(find.byType(LinearProgressIndicator), findsNothing);
+    expect(find.text('Cancel'), findsNothing);
   });
 
-  testWidgets('After complete, slider compares before/after and Save/Share succeed',
+  testWidgets('Cancel button stops the job cleanly', (tester) async {
+    final bytes = _png(128, 128);
+    final fakeIo = _FakeImageIo(bytes);
+    final runner = _FakeRunner((img, config, prog, token) async {
+      prog?.call(0.2);
+      final cancelled = Completer<void>();
+      token?.addListener(cancelled.complete);
+      await cancelled.future;
+      throw const UpscaleCancelledException();
+    });
+
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(body: UpscaleTab(imageIo: fakeIo, runner: runner)),
+    ));
+    await tester.tap(find.text('Gallery'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Upscale 4×'));
+    await tester.pump();
+    expect(find.text('Cancel'), findsOneWidget);
+
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+
+    // Back to the preview action, no progress, no error SnackBar.
+    expect(find.text('Upscale 4×'), findsOneWidget);
+    expect(find.byType(LinearProgressIndicator), findsNothing);
+    expect(find.byType(SnackBar), findsNothing);
+  });
+
+  testWidgets('Job config carries the model path and GPU flag', (tester) async {
+    final bytes = _png(64, 64);
+    final fakeIo = _FakeImageIo(bytes);
+    final runner = _FakeRunner((img, config, prog, token) async {
+      prog?.call(1.0);
+      return _png(256, 256);
+    });
+
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: UpscaleTab(imageIo: fakeIo, runner: runner, useGpu: true),
+      ),
+    ));
+    await tester.tap(find.text('Gallery'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Upscale 4×'));
+    await tester.pumpAndSettle();
+
+    expect(runner.lastConfig?.modelPath,
+        'assets/models/realesr-general-x4v3_fp16.tflite');
+    expect(runner.lastConfig?.useGpu, true);
+    expect(runner.lastToken, isNotNull);
+  });
+
+  testWidgets(
+      'After complete, slider compares before/after and Save/Share succeed',
       (tester) async {
     final inBytes = _png(20, 20);
     final outBytes = _png(80, 80);
     final fakeIo = _FakeImageIo(inBytes);
-    final pipeline = _FakePipeline((img, p) async {
+    final runner = _FakeRunner((img, config, p, token) async {
       p?.call(1.0);
       return outBytes;
     });
 
     await tester.pumpWidget(MaterialApp(
-      home: Scaffold(body: UpscaleTab(imageIo: fakeIo, pipeline: pipeline)),
+      home: Scaffold(body: UpscaleTab(imageIo: fakeIo, runner: runner)),
     ));
     await tester.tap(find.text('Gallery'));
     await tester.pumpAndSettle();

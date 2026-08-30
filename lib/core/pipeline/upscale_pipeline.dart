@@ -5,6 +5,16 @@ import 'package:image/image.dart' as img;
 import '../engine/tflite_engine.dart';
 import 'tensors.dart';
 
+/// Thrown when an [UpscaleJob] is aborted through its cancellation signal
+/// between tiles. The [UpscaleJobRunner] surface translates this into a
+/// quiet "cancelled" state — not an error.
+class UpscaleCancelledException implements Exception {
+  const UpscaleCancelledException();
+
+  @override
+  String toString() => 'Upscale cancelled';
+}
+
 class UpscalePipeline {
   final TfliteEngine engine;
   final int tileSize;
@@ -21,9 +31,12 @@ class UpscalePipeline {
   /// Highest seam: upscale imageBytes (encoded PNG/JPEG) -> upscaled bytes (PNG).
   /// Validates 4096 limit, tiles with overlap, runs Engine per tile
   /// (Preprocess -> infer -> feathered Stitch), reports progress.
+  /// [isCancelled] is polled between tiles; when it turns true the job aborts
+  /// with [UpscaleCancelledException].
   Future<Uint8List> upscale(
     Uint8List imageBytes, {
     void Function(double progress)? onProgress,
+    bool Function()? isCancelled,
   }) async {
     if (!engine.isLoaded) {
       throw Exception('Model is corrupt, please re-download');
@@ -31,10 +44,10 @@ class UpscalePipeline {
 
     // Try primary tile size, fallback to 64 on OOM
     try {
-      return await _process(imageBytes, tileSize, onProgress);
+      return await _process(imageBytes, tileSize, onProgress, isCancelled);
     } catch (e) {
       if (_isOom(e)) {
-        return await _process(imageBytes, 64, onProgress);
+        return await _process(imageBytes, 64, onProgress, isCancelled);
       }
       rethrow;
     }
@@ -62,6 +75,7 @@ class UpscalePipeline {
     Uint8List imageBytes,
     int ts,
     void Function(double)? onProgress,
+    bool Function()? isCancelled,
   ) async {
     final decoded = img.decodeImage(imageBytes);
     if (decoded == null) throw Exception('Failed to decode image');
@@ -88,6 +102,9 @@ class UpscalePipeline {
     int done = 0;
     for (final y in ys) {
       for (final x in xs) {
+        if (isCancelled != null && isCancelled()) {
+          throw const UpscaleCancelledException();
+        }
         // Full-size source tile (edges clamped; shorter axes padded later by
         // Preprocess edge replication).
         final tile = img.copyCrop(decoded,
