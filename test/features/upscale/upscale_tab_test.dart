@@ -199,6 +199,39 @@ void main() {
     expect(runner.lastToken, isNotNull);
   });
 
+  testWidgets('Friendly memory-guard error surfaces in the tab',
+      (tester) async {
+    final bytes = _png(64, 64);
+    final fakeIo = _FakeImageIo(bytes);
+    final runner = _FakeRunner((img, config, prog, token) async {
+      throw const MemoryEstimateExceededException(4456448, 52428800);
+    });
+
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(body: UpscaleTab(imageIo: fakeIo, runner: runner)),
+    ));
+    await tester.tap(find.text('Gallery'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Upscale 4×'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(SnackBar), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(SnackBar),
+        matching: find.textContaining('too large'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byType(SnackBar),
+        matching: find.textContaining('Try a smaller image'),
+      ),
+      findsOneWidget,
+    );
+  });
+
   testWidgets(
       'After complete, slider compares before/after and Save/Share succeed',
       (tester) async {

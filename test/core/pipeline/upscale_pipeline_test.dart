@@ -198,6 +198,43 @@ void main() {
       expect(engine.calls, 3);
     });
 
+    test('estimateUpscaleMemoryBytes: input + output at 4 B/px', () {
+      // 1024^2 decoded input + 4096^2 output canvas, 4 bytes per pixel.
+      expect(estimateUpscaleMemoryBytes(1024, 1024), 71303168);
+      expect(estimateUpscaleMemoryBytes(100, 80), (100 * 80 + 400 * 320) * 4);
+    });
+
+    test('memory guard rejects jobs above the limit before any inference',
+        () async {
+      final engine = _FakeEngine();
+      final pipeline = UpscalePipeline(engine: engine, memoryLimitBytes: 1000);
+      final input = _makePng(256, 256, fill: img.ColorRgb8(50, 50, 50));
+
+      await expectLater(
+        pipeline.upscale(input),
+        throwsA(isA<MemoryEstimateExceededException>()),
+      );
+      expect(engine.calls, 0);
+    });
+
+    test('memory guard message is user-friendly (no OOM jargon)', () async {
+      final pipeline =
+          UpscalePipeline(engine: _FakeEngine(), memoryLimitBytes: 1000);
+      final input = _makePng(256, 256, fill: img.ColorRgb8(50, 50, 50));
+
+      try {
+        await pipeline.upscale(input);
+        fail('expected MemoryEstimateExceededException');
+      } on MemoryEstimateExceededException catch (e) {
+        final message = e.toString();
+        expect(message, contains('too large'));
+        expect(message, contains('Try a smaller image'));
+        // Must NOT look like an OOM, or the down-tile retry would re-run it.
+        expect(message.contains('OOM'), false);
+        expect(message.contains('out of memory'), false);
+      }
+    });
+
     test('Image exceeds 4096 throws', () async {
       final engine = _FakeEngine();
       final pipeline = UpscalePipeline(engine: engine);

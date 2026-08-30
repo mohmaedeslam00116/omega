@@ -15,17 +15,47 @@ class UpscaleCancelledException implements Exception {
   String toString() => 'Upscale cancelled';
 }
 
+/// Thrown by the pre-flight memory guard when the estimated decode + output
+/// footprint exceeds the pipeline's memory limit. The message is
+/// user-facing (shown in the Upscale tab) — keep it free of OOM jargon so it
+/// never looks like an out-of-memory retry trigger.
+class MemoryEstimateExceededException implements Exception {
+  final int estimatedBytes;
+  final int limitBytes;
+
+  const MemoryEstimateExceededException(this.estimatedBytes, this.limitBytes);
+
+  static String _mb(int bytes) => (bytes / (1024 * 1024)).round().toString();
+
+  @override
+  String toString() =>
+      'Image is too large to upscale on this device '
+      '(needs ~${_mb(estimatedBytes)} MB, limit is ${_mb(limitBytes)} MB). '
+      'Try a smaller image.';
+}
+
+/// Pre-flight estimate of the peak pixel memory one upscale needs:
+/// the decoded input image plus the full output canvas, both RGBA
+/// (4 bytes per pixel).
+int estimateUpscaleMemoryBytes(int width, int height, {int scale = 4}) =>
+    (width * height + width * scale * (height * scale)) * 4;
+
 class UpscalePipeline {
   final TfliteEngine engine;
   final int tileSize;
   final int overlap;
   final int scale;
 
+  /// Pre-flight budget: jobs whose estimated decode + output footprint
+  /// exceeds this are rejected before any inference (ADR-0007 decision 3).
+  final int memoryLimitBytes;
+
   UpscalePipeline({
     required this.engine,
     this.tileSize = 128,
     this.overlap = 36,
     this.scale = 4,
+    this.memoryLimitBytes = 512 * 1024 * 1024,
   });
 
   /// Highest seam: upscale imageBytes (encoded PNG/JPEG) -> upscaled bytes (PNG).
@@ -84,6 +114,13 @@ class UpscalePipeline {
     final h = decoded.height;
     if (w > 4096 || h > 4096) {
       throw UnsupportedError('Image exceeds 4096px, please crop or choose smaller');
+    }
+
+    // Pre-flight memory guard: refuse the job (with a friendly message)
+    // before allocating anything big. Not an OOM — never retried.
+    final estimated = estimateUpscaleMemoryBytes(w, h, scale: scale);
+    if (estimated > memoryLimitBytes) {
+      throw MemoryEstimateExceededException(estimated, memoryLimitBytes);
     }
 
     final stride = _strideFor(ts);
