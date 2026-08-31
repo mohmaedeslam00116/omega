@@ -7,16 +7,11 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Include directories
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
-# Import prebuilt libMNN.so if present
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../jniLibs/${ANDROID_ABI}/libMNN.so")
-    add_library(MNN SHARED IMPORTED)
-    set_target_properties(MNN PROPERTIES
-        IMPORTED_LOCATION "${CMAKE_CURRENT_SOURCE_DIR}/../jniLibs/${ANDROID_ABI}/libMNN.so"
-    )
-    set(MNN_LIB MNN)
-else()
-    set(MNN_LIB "")
-endif()
+# Import prebuilt libMNN.so
+add_library(MNN SHARED IMPORTED)
+set_target_properties(MNN PROPERTIES
+    IMPORTED_LOCATION "${CMAKE_CURRENT_SOURCE_DIR}/../jniLibs/${ANDROID_ABI}/libMNN.so"
+)
 
 # Build Omega C wrapper
 add_library(omega_mnn SHARED
@@ -28,7 +23,7 @@ find_library(log-lib log)
 find_library(vulkan-lib vulkan)
 
 target_link_libraries(omega_mnn
-    ${MNN_LIB}
+    MNN
     ${log-lib}
     ${vulkan-lib}
 )
