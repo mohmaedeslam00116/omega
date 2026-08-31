@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -85,6 +86,26 @@ void main() {
   });
 
   group('IsolateUpscaleJobRunner', () {
+    test('resolveModelPathForWorker copies bundled assets to a real file',
+        () async {
+      // Bundled assets cannot be read via rootBundle inside the worker
+      // Isolate — the runner must materialize them as files on the caller
+      // side before spawning.
+      final path = await resolveModelPathForWorker(
+          'assets/models/realesr-general-x4v3_fp16.tflite',
+          tempDirOverride: () async => Directory.systemTemp);
+      expect(path, isNot(startsWith('assets/')));
+      expect(File(path).existsSync(), true);
+      expect(File(path).lengthSync(), greaterThan(0));
+      File(path).deleteSync();
+    });
+
+    test('resolveModelPathForWorker passes file paths through untouched',
+        () async {
+      expect(await resolveModelPathForWorker('/cache/models/x.tflite'),
+          '/cache/models/x.tflite');
+    });
+
     test('runs a stub job in a fresh Isolate with throttled progress',
         () async {
       final runner = IsolateUpscaleJobRunner();

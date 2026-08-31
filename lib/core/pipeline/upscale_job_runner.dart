@@ -1,6 +1,10 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:isolate';
 import 'dart:typed_data';
+
+import 'package:flutter/services.dart' show rootBundle;
+import 'package:path_provider/path_provider.dart';
 
 import '../engine/tflite_engine.dart';
 import '../engine/tflite_engine_impl.dart';
@@ -135,6 +139,23 @@ class InlineUpscaleJobRunner implements UpscaleJobRunner {
   }
 }
 
+/// Bundled assets (`assets/...`) cannot be read via rootBundle inside the
+/// worker Isolate — there is no Flutter binding there. Materialize them as
+/// real files on the caller side first; file paths pass through untouched.
+Future<String> resolveModelPathForWorker(
+  String modelPath, {
+  Future<Directory> Function()? tempDirOverride,
+}) async {
+  if (!modelPath.startsWith('assets/')) return modelPath;
+  final data = await rootBundle.load(modelPath);
+  final dir = await (tempDirOverride ?? getTemporaryDirectory)();
+  final file = File('${dir.path}/models/${modelPath.split('/').last}');
+  await file.create(recursive: true);
+  await file.writeAsBytes(
+      data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes));
+  return file.path;
+}
+
 /// Spawns a FRESH Isolate per UpscaleJob (ADR-0007). The Engine is
 /// constructed inside the Isolate from [UpscaleJobConfig.modelPath] +
 /// [UpscaleJobConfig.useGpu]; progress crosses back time-throttled (~120ms)
@@ -170,6 +191,17 @@ class IsolateUpscaleJobRunner implements UpscaleJobRunner {
     // Only sendable values are captured by the worker closure below:
     // a SendPort, the image bytes and the config.
     final progressSend = progressPort.sendPort;
+    // Bundled assets must be materialized to files on THIS side — the worker
+    // has no Flutter binding to read rootBundle.
+    final workerPath = await resolveModelPathForWorker(config.modelPath);
+    final workerConfig = UpscaleJobConfig(
+      modelPath: workerPath,
+      useGpu: config.useGpu,
+      tileSize: config.tileSize,
+      overlap: config.overlap,
+      scale: config.scale,
+      engineKind: config.engineKind,
+    );
 
     final future = Isolate.run(() async {
       final workerCancel = ReceivePort();
@@ -181,7 +213,7 @@ class IsolateUpscaleJobRunner implements UpscaleJobRunner {
       final throttler = ProgressThrottler(minInterval: _minProgressInterval);
       return runUpscaleWithEngine(
         imageBytes,
-        config: config,
+        config: workerConfig,
         engineFactory: config.engineKind == JobEngineKind.real
             ? TfliteEngineImpl.new
             : TfliteEngineStub.new,
