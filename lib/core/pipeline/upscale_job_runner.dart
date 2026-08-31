@@ -156,14 +156,58 @@ Future<String> resolveModelPathForWorker(
   return file.path;
 }
 
+class _WorkerMessage {
+  final SendPort progressSend;
+  final Uint8List imageBytes;
+  final UpscaleJobConfig config;
+
+  const _WorkerMessage({
+    required this.progressSend,
+    required this.imageBytes,
+    required this.config,
+  });
+}
+
+Future<Uint8List> _isolateWorker(_WorkerMessage msg) async {
+  final workerCancel = ReceivePort();
+  final localToken = CancelToken();
+  workerCancel.listen((_) => localToken.cancel());
+  // Handshake: hand the main isolate our cancel channel.
+  msg.progressSend.send(['port', workerCancel.sendPort]);
+
+  final throttler =
+      ProgressThrottler(minInterval: const Duration(milliseconds: 120));
+  return runUpscaleWithEngine(
+    msg.imageBytes,
+    config: msg.config,
+    engineFactory: msg.config.engineKind == JobEngineKind.real
+        ? TfliteEngineImpl.new
+        : TfliteEngineStub.new,
+    onProgress: (p) {
+      // The final tick is emitted by the caller after completion, so it
+      // cannot race with this port closing.
+      if (p < 1.0 && throttler.shouldSend(p)) {
+        msg.progressSend.send(['progress', p]);
+      }
+    },
+    cancelToken: localToken,
+  );
+}
+
+/// Launch the worker isolate in its OWN top-level function scope.
+/// This prevents Dart from merging the Isolate.run closure into the shared
+/// context of IsolateUpscaleJobRunner.run (which contains non-sendable
+/// references like onProgress → _UpscaleTabState).
+Future<Uint8List> _launchWorkerIsolate(_WorkerMessage msg) {
+  return Isolate.run(() => _isolateWorker(msg));
+}
+
 /// Spawns a FRESH Isolate per UpscaleJob (ADR-0007). The Engine is
 /// constructed inside the Isolate from [UpscaleJobConfig.modelPath] +
 /// [UpscaleJobConfig.useGpu]; progress crosses back time-throttled (~120ms)
 /// and cancellation flows in through a handshake port. The worker closes its
 /// Engine when the job ends, so every job starts from a clean slate.
 class IsolateUpscaleJobRunner implements UpscaleJobRunner {
-  static const _minProgressInterval = Duration(milliseconds: 120);
-
   @override
   Future<Uint8List> run(
     Uint8List imageBytes, {
@@ -188,9 +232,6 @@ class IsolateUpscaleJobRunner implements UpscaleJobRunner {
       });
     }
 
-    // Only sendable values are captured by the worker closure below:
-    // a SendPort, the image bytes and the config.
-    final progressSend = progressPort.sendPort;
     // Bundled assets must be materialized to files on THIS side — the worker
     // has no Flutter binding to read rootBundle.
     final workerPath = await resolveModelPathForWorker(config.modelPath);
@@ -203,30 +244,13 @@ class IsolateUpscaleJobRunner implements UpscaleJobRunner {
       engineKind: config.engineKind,
     );
 
-    final future = Isolate.run(() async {
-      final workerCancel = ReceivePort();
-      final localToken = CancelToken();
-      workerCancel.listen((_) => localToken.cancel());
-      // Handshake: hand the main isolate our cancel channel.
-      progressSend.send(['port', workerCancel.sendPort]);
+    final msg = _WorkerMessage(
+      progressSend: progressPort.sendPort,
+      imageBytes: imageBytes,
+      config: workerConfig,
+    );
 
-      final throttler = ProgressThrottler(minInterval: _minProgressInterval);
-      return runUpscaleWithEngine(
-        imageBytes,
-        config: workerConfig,
-        engineFactory: config.engineKind == JobEngineKind.real
-            ? TfliteEngineImpl.new
-            : TfliteEngineStub.new,
-        onProgress: (p) {
-          // The final tick is emitted by the caller after completion, so it
-          // cannot race with this port closing.
-          if (p < 1.0 && throttler.shouldSend(p)) {
-            progressSend.send(['progress', p]);
-          }
-        },
-        cancelToken: localToken,
-      );
-    });
+    final future = _launchWorkerIsolate(msg);
 
     progressPort.listen((message) {
       if (message is List && message.isNotEmpty) {

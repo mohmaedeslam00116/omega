@@ -529,4 +529,43 @@ void main() {
     await tester.pumpAndSettle();
     expect(fakeIo.shareCalled, true);
   });
+
+  testWidgets(
+      'Before/After comparison handles images without RenderFlex overflow',
+      (tester) async {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+    tester.view.physicalSize = const Size(360, 640);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    final inBytes = _png(80, 80);
+    final outBytes = _png(160, 160);
+    final fakeIo = _FakeImageIo(inBytes);
+    final runner = _FakeRunner((img, config, p, token) async {
+      p?.call(1.0);
+      return outBytes;
+    });
+
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: UpscaleTab(
+          imageIo: fakeIo,
+          runner: runner,
+          downloadManager: _FakeDownloadManager(downloaded: {}),
+          settingsService: await SettingsService.init(),
+        ),
+      ),
+    ));
+    await tester.tap(find.text('Gallery'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Upscale 4×'));
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('Before'), findsOneWidget);
+    expect(find.text('After'), findsOneWidget);
+  });
 }

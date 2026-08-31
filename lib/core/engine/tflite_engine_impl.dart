@@ -8,6 +8,12 @@ import 'tflite_engine.dart';
 /// Real implementation wrapping tflite_flutter Interpreter.
 /// Used in production (Ticket 04), while TfliteEngineStub is used in tests.
 /// Handles GpuDelegateV2 with XNNPACK CPU fallback (4 threads).
+///
+/// Some TFLite models (e.g. Real-ESRGAN fp16 converted via PyTorch → ONNX →
+/// TFLite) contain dozens of "input" tensors that are really unfused constant
+/// parameters. Only tensor 0 is the actual image input; the rest must be
+/// zero-filled before the first invoke or TFLite will error with
+/// "Input tensor N lacks data".
 class TfliteEngineImpl implements TfliteEngine {
   Interpreter? _interpreter;
   bool _useGpu = false;
@@ -55,6 +61,24 @@ class TfliteEngineImpl implements TfliteEngine {
         _interpreter = await Interpreter.fromAsset(modelPath, options: options);
       }
       _interpreter!.allocateTensors();
+
+      final inputTensors = _interpreter!.getInputTensors();
+      final outputTensors = _interpreter!.getOutputTensors();
+      print('[TFLite] Inputs count: ${inputTensors.length}, Outputs count: ${outputTensors.length}');
+      for (var i = 0; i < inputTensors.length; i++) {
+        final t = inputTensors[i];
+        print('[TFLite] Input $i: name="${t.name}", shape=${t.shape}, type=${t.type}, bytes=${t.numBytes()}');
+      }
+
+      // Zero-fill all secondary input tensors (unfused constants from model conversion)
+      for (var i = 1; i < inputTensors.length; i++) {
+        final t = inputTensors[i];
+        final size = t.numBytes();
+        if (size > 0) {
+          t.setTo(Uint8List(size));
+        }
+      }
+
       _isLoaded = true;
     } catch (_) {
       _interpreter = null;
@@ -79,19 +103,50 @@ class TfliteEngineImpl implements TfliteEngine {
     // and ByteConversionUtils.convertObjectToBytes.
     final inBytes =
         Uint8List.view(input.buffer, input.offsetInBytes, input.lengthInBytes);
-    if (inBytes.length != inputTensor.data.length) {
+    if (inBytes.length != inputTensor.numBytes()) {
       throw ArgumentError(
         'Input tensor size mismatch: Model expects '
-        '${inputTensor.data.length} bytes (shape ${inputTensor.shape}), '
+        '${inputTensor.numBytes()} bytes (shape ${inputTensor.shape}), '
         'got ${inBytes.length} bytes (${input.length} floats).',
       );
     }
 
-    final outBytes = Uint8List(outputTensor.data.length);
-    interpreter.run(inBytes, outBytes);
+    // Set data directly on tensor 0 and invoke — bypasses interpreter.run()
+    // which only fills the first N inputs from its list arg, leaving the
+    // secondary constant tensors (already zero-filled at load time) untouched.
+    print('[TFLite] infer: setting input 0 with ${inBytes.length} bytes');
+    inputTensor.setTo(inBytes);
+    print('[TFLite] infer: calling invoke()...');
+    interpreter.invoke();
+    print('[TFLite] infer: invoke() succeeded');
 
-    final out = Float32List(outBytes.length ~/ 4);
-    out.setAll(0, Float32List.view(outBytes.buffer));
+    // Copy output bytes out.
+    final outBytes = Uint8List(outputTensor.numBytes());
+    outputTensor.copyTo(outBytes);
+
+    final rawFloats = Float32List.view(outBytes.buffer);
+
+    // Safeguard: If the model outputs NCHW [1, 3, H, W], transpose to NHWC [H, W, 3]
+    final shape = outputTensor.shape;
+    if (shape.length == 4 && shape[1] == 3) {
+      final h = shape[2];
+      final w = shape[3];
+      final plane = h * w;
+      final nhwc = Float32List(plane * 3);
+      for (var y = 0; y < h; y++) {
+        for (var x = 0; x < w; x++) {
+          final idx = y * w + x;
+          final outIdx = idx * 3;
+          nhwc[outIdx] = rawFloats[idx]; // R
+          nhwc[outIdx + 1] = rawFloats[plane + idx]; // G
+          nhwc[outIdx + 2] = rawFloats[2 * plane + idx]; // B
+        }
+      }
+      return nhwc;
+    }
+
+    final out = Float32List(rawFloats.length);
+    out.setAll(0, rawFloats);
     return out;
   }
 

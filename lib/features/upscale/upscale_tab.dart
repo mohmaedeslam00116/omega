@@ -78,9 +78,22 @@ class _UpscaleTabState extends State<UpscaleTab> {
       scale: 4,
       type: ModelType.general,
       inputSize: 128,
-      fileSize: 3549456,
-      sha256: '6d597b46d812ada42bdde641ec6e78c0ef0b78ff5a825fcfd74b9a1b3bcbe9a4',
+      fileSize: 8389964,
+      sha256: '86d076d2acce51190d41cfdde3acdc431c2861dd747f5707cc65003a2e2c5814',
       url: 'https://github.com/mohmaedeslam00116/omega-models/releases/download/v1.0.0/realesr-general-x4v3_fp16.tflite',
+      license: 'BSD-3-Clause',
+      version: '1.0.0',
+      bundled: true,
+    ),
+    CatalogEntry(
+      id: 'realesr-animevideov3',
+      name: 'Anime & Digital Art 4×',
+      scale: 4,
+      type: ModelType.anime,
+      inputSize: 128,
+      fileSize: 1271540,
+      sha256: '74189d7c0b8e7aafcfef3038e5f76d7d73b28d19327e82f28cb43d179cc5be99',
+      url: 'https://github.com/mohmaedeslam00116/omega-models/releases/download/v1.0.0/realesr-animevideov3_fp16.tflite',
       license: 'BSD-3-Clause',
       version: '1.0.0',
       bundled: true,
@@ -226,7 +239,8 @@ class _UpscaleTabState extends State<UpscaleTab> {
     } on UpscaleCancelledException {
       // Cancelled from the UI — quietly return to the preview state.
       if (mounted) setState(() => _isProcessing = false);
-    } catch (e) {
+    } catch (e, stack) {
+      debugPrint('UPSCALE ERROR: $e\n$stack');
       if (!mounted) return;
       setState(() {
         _isProcessing = false;
@@ -366,13 +380,19 @@ class _UpscaleTabState extends State<UpscaleTab> {
             const SizedBox(height: 12),
             if (_error != null)
               Container(
-                padding: const EdgeInsets.all(10),
+                constraints: const BoxConstraints(maxHeight: 70),
+                padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   color: const Color(0xFFFEF2F2),
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(color: const Color(0xFFFECACA)),
                 ),
-                child: Text(_error!, style: const TextStyle(color: Color(0xFF991B1B), fontSize: 12)),
+                child: SingleChildScrollView(
+                  child: Text(
+                    _error!,
+                    style: const TextStyle(color: Color(0xFF991B1B), fontSize: 12),
+                  ),
+                ),
               ),
             if (_error != null) const SizedBox(height: 8),
             if (_isProcessing)
@@ -531,28 +551,44 @@ class _UpscaleTabState extends State<UpscaleTab> {
       child: Column(
         children: [
           Expanded(
-            child: Stack(
-              children: [
-                // After (full)
-                Positioned.fill(
-                  child: Image.memory(_outputBytes!, fit: BoxFit.contain),
-                ),
-                // Before clipped by slider
-                ClipRect(
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    widthFactor: _slider,
-                    child: Image.memory(_inputBytes!, fit: BoxFit.contain),
-                  ),
-                ),
-                // Divider
-                Positioned(
-                  left: MediaQuery.of(context).size.width * _slider - 1,
-                  top: 0,
-                  bottom: 0,
-                  child: Container(width: 2, color: Colors.white),
-                ),
-              ],
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final width = constraints.maxWidth;
+                final height = constraints.maxHeight;
+                return Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    // After (full)
+                    Positioned.fill(
+                      child: Image.memory(_outputBytes!, fit: BoxFit.contain),
+                    ),
+                    // Before clipped by slider
+                    Positioned(
+                      left: 0,
+                      top: 0,
+                      bottom: 0,
+                      width: width * _slider,
+                      child: ClipRect(
+                        child: OverflowBox(
+                          alignment: Alignment.centerLeft,
+                          minWidth: width,
+                          maxWidth: width,
+                          minHeight: height,
+                          maxHeight: height,
+                          child: Image.memory(_inputBytes!, fit: BoxFit.contain),
+                        ),
+                      ),
+                    ),
+                    // Divider
+                    Positioned(
+                      left: (width * _slider - 1).clamp(0.0, width - 2.0),
+                      top: 0,
+                      bottom: 0,
+                      child: Container(width: 2, color: Colors.white),
+                    ),
+                  ],
+                );
+              },
             ),
           ),
           Padding(
