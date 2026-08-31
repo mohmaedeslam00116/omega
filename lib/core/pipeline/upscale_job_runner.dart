@@ -22,8 +22,9 @@ class UpscaleJobConfig {
   final String modelPath;
   final bool useGpu;
   final int tileSize;
-  final int overlap;
+  final int? overlap;
   final int scale;
+  final int memoryLimitBytes;
   final JobEngineKind engineKind;
 
   const UpscaleJobConfig({
@@ -32,6 +33,7 @@ class UpscaleJobConfig {
     this.tileSize = 128,
     this.overlap = 36,
     this.scale = 4,
+    this.memoryLimitBytes = MemoryGuard.defaultMemoryLimitBytes,
     this.engineKind = JobEngineKind.real,
   });
 }
@@ -103,6 +105,7 @@ Future<Uint8List> runUpscaleWithEngine(
     tileSize: config.tileSize,
     overlap: config.overlap,
     scale: config.scale,
+    memoryLimitBytes: config.memoryLimitBytes,
   );
   try {
     return await pipeline.upscale(
@@ -242,6 +245,7 @@ class IsolateUpscaleJobRunner implements UpscaleJobRunner {
       tileSize: config.tileSize,
       overlap: config.overlap,
       scale: config.scale,
+      memoryLimitBytes: config.memoryLimitBytes,
       engineKind: config.engineKind,
     );
 

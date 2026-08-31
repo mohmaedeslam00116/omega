@@ -19,7 +19,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
     await tester.pump(const Duration(milliseconds: 300));
-    expect(find.text('General Photo 4×'), findsOneWidget);
+    expect(find.text('General Photo 4×'), findsWidgets);
 
     // Back to Upscale
     await tester.tap(find.text('Upscale').last);

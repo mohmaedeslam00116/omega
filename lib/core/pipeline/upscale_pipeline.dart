@@ -3,7 +3,10 @@ import 'dart:typed_data';
 import 'package:image/image.dart' as img;
 
 import '../engine/tflite_engine.dart';
+import 'memory_guard.dart';
 import 'tensors.dart';
+
+export 'memory_guard.dart';
 
 /// Thrown when an [UpscaleJob] is aborted through its cancellation signal
 /// between tiles. The [UpscaleJobRunner] surface translates this into a
@@ -15,35 +18,10 @@ class UpscaleCancelledException implements Exception {
   String toString() => 'Upscale cancelled';
 }
 
-/// Thrown by the pre-flight memory guard when the estimated decode + output
-/// footprint exceeds the pipeline's memory limit. The message is
-/// user-facing (shown in the Upscale tab) — keep it free of OOM jargon so it
-/// never looks like an out-of-memory retry trigger.
-class MemoryEstimateExceededException implements Exception {
-  final int estimatedBytes;
-  final int limitBytes;
-
-  const MemoryEstimateExceededException(this.estimatedBytes, this.limitBytes);
-
-  static String _mb(int bytes) => (bytes / (1024 * 1024)).round().toString();
-
-  @override
-  String toString() =>
-      'Image is too large to upscale on this device '
-      '(needs ~${_mb(estimatedBytes)} MB, limit is ${_mb(limitBytes)} MB). '
-      'Try a smaller image.';
-}
-
-/// Pre-flight estimate of the peak pixel memory one upscale needs:
-/// the decoded input image plus the full output canvas, both RGBA
-/// (4 bytes per pixel).
-int estimateUpscaleMemoryBytes(int width, int height, {int scale = 4}) =>
-    (width * height + width * scale * (height * scale)) * 4;
-
 class UpscalePipeline {
   final TfliteEngine engine;
   final int tileSize;
-  final int overlap;
+  final int? overlap;
   final int scale;
 
   /// Pre-flight budget: jobs whose estimated decode + output footprint
@@ -53,9 +31,9 @@ class UpscalePipeline {
   UpscalePipeline({
     required this.engine,
     this.tileSize = 128,
-    this.overlap = 36,
+    this.overlap,
     this.scale = 4,
-    this.memoryLimitBytes = 512 * 1024 * 1024,
+    this.memoryLimitBytes = MemoryGuard.defaultMemoryLimitBytes,
   });
 
   /// Highest seam: upscale imageBytes (encoded PNG/JPEG) -> upscaled bytes (PNG).
@@ -88,9 +66,14 @@ class UpscalePipeline {
       e is OutOfMemoryError ||
       e.toString().contains('out of memory');
 
+  int _effectiveOverlap(int ts) => overlap ?? MemoryGuard.overlapForTileSize(ts);
+
   /// Stride = tileSize - overlap, floored so neighbouring tiles always share
   /// at least half a tile (guards against overlap >= tileSize).
-  int _strideFor(int ts) => ts - math.min(overlap, ts ~/ 2);
+  int _strideFor(int ts) {
+    final ov = _effectiveOverlap(ts);
+    return ts - math.min(ov, ts ~/ 2);
+  }
 
   /// Tile origins along one axis. Every tile is FULL size: origins are clamped
   /// so the last tile ends exactly at the edge (w >= ts), and a single tile
@@ -112,16 +95,16 @@ class UpscalePipeline {
 
     final w = decoded.width;
     final h = decoded.height;
-    if (w > 4096 || h > 4096) {
-      throw UnsupportedError('Image exceeds 4096px, please crop or choose smaller');
-    }
 
     // Pre-flight memory guard: refuse the job (with a friendly message)
     // before allocating anything big. Not an OOM — never retried.
-    final estimated = estimateUpscaleMemoryBytes(w, h, scale: scale);
-    if (estimated > memoryLimitBytes) {
-      throw MemoryEstimateExceededException(estimated, memoryLimitBytes);
-    }
+    MemoryGuard.validateMemory(
+      width: w,
+      height: h,
+      scale: scale,
+      tileSize: ts,
+      memoryLimitBytes: memoryLimitBytes,
+    );
 
     final stride = _strideFor(ts);
     final xs = _positions(w, ts, stride);
@@ -134,7 +117,8 @@ class UpscalePipeline {
     final canvas = Uint8List(outW * outH * 3);
     final weights = Uint8List(outW * outH);
     final outSide = ts * scale;
-    final window = featherWeights(size: outSide, feather: overlap * scale);
+    final ov = _effectiveOverlap(ts);
+    final window = featherWeights(size: outSide, feather: ov * scale);
 
     int done = 0;
     for (final y in ys) {

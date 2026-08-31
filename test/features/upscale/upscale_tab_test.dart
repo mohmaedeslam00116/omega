@@ -131,6 +131,10 @@ class _FakeRunner implements UpscaleJobRunner {
 }
 
 void main() {
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+  });
+
   testWidgets('Empty state with pick CTA; after pick, preview shows',
       (tester) async {
     final bytes = _png(100, 100);
@@ -369,8 +373,22 @@ void main() {
       throw const MemoryEstimateExceededException(4456448, 52428800);
     });
 
+    SharedPreferences.setMockInitialValues({'selectedModelId': 'realesr-general-x4v3'});
+    final prefs = await SharedPreferences.getInstance();
     await tester.pumpWidget(MaterialApp(
-      home: Scaffold(body: UpscaleTab(imageIo: fakeIo, runner: runner, downloadManager: _FakeDownloadManager(downloaded: {}))),
+      home: Scaffold(
+        body: UpscaleTab(
+          imageIo: fakeIo,
+          runner: runner,
+          settingsService: SettingsService(prefs),
+          downloadManager: _FakeDownloadManager(downloaded: {
+            'realesr-general-x4v3',
+            'realesr-animevideov3',
+            'realesr-x4plus-int8',
+            'realesr-x4plus-fp16',
+          }),
+        ),
+      ),
     ));
     await tester.tap(find.text('Gallery'));
     await tester.pumpAndSettle();
