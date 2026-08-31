@@ -31,12 +31,18 @@ OMEGA_EXPORT OmegaMNNContext* omega_mnn_create(
     int precision_mode,
     int num_threads
 ) {
-    if (!model_path) return nullptr;
+    if (!model_path) {
+        LOGE("[OmegaMNN-Native] model_path is NULL!");
+        return nullptr;
+    }
+    LOGI("[OmegaMNN-Native] Creating MNN Interpreter for: %s (forwardType: %d, precision: %d, threads: %d)",
+         model_path, forward_type, precision_mode, num_threads);
+
     auto* ctx = new OmegaMNNContext();
 
     ctx->net = std::shared_ptr<MNN::Interpreter>(MNN::Interpreter::createFromFile(model_path));
     if (!ctx->net) {
-        LOGE("Failed to create MNN Interpreter from file: %s", model_path);
+        LOGE("[OmegaMNN-Native] Failed to create MNN Interpreter from file: %s", model_path);
         delete ctx;
         return nullptr;
     }
@@ -52,14 +58,13 @@ OMEGA_EXPORT OmegaMNNContext* omega_mnn_create(
 
     ctx->session = ctx->net->createSession(config);
     if (!ctx->session && forward_type != MNN_FORWARD_CPU) {
-        // Fallback to CPU if Vulkan/OpenCL fails
-        LOGI("GPU session creation failed, falling back to CPU...");
+        LOGI("[OmegaMNN-Native] GPU (Vulkan) session creation failed, falling back to CPU...");
         config.type = MNN_FORWARD_CPU;
         ctx->session = ctx->net->createSession(config);
     }
 
     if (!ctx->session) {
-        LOGE("Failed to create MNN session for: %s", model_path);
+        LOGE("[OmegaMNN-Native] Failed to create MNN session for: %s", model_path);
         delete ctx;
         return nullptr;
     }
@@ -67,7 +72,18 @@ OMEGA_EXPORT OmegaMNNContext* omega_mnn_create(
     ctx->input_tensor = ctx->net->getSessionInput(ctx->session, nullptr);
     ctx->output_tensor = ctx->net->getSessionOutput(ctx->session, nullptr);
 
-    LOGI("MNN session created successfully for: %s (forward: %d)", model_path, forward_type);
+    if (ctx->input_tensor) {
+        LOGI("[OmegaMNN-Native] Input tensor: batch=%d, channel=%d, height=%d, width=%d",
+             ctx->input_tensor->batch(), ctx->input_tensor->channel(),
+             ctx->input_tensor->height(), ctx->input_tensor->width());
+    }
+    if (ctx->output_tensor) {
+        LOGI("[OmegaMNN-Native] Output tensor: batch=%d, channel=%d, height=%d, width=%d",
+             ctx->output_tensor->batch(), ctx->output_tensor->channel(),
+             ctx->output_tensor->height(), ctx->output_tensor->width());
+    }
+
+    LOGI("[OmegaMNN-Native] MNN session successfully initialized and ready!");
     return ctx;
 }
 
@@ -78,8 +94,12 @@ OMEGA_EXPORT int omega_mnn_resize_input(
     int height,
     int width
 ) {
-    if (!ctx || !ctx->net || !ctx->session || !ctx->input_tensor) return -1;
+    if (!ctx || !ctx->net || !ctx->session || !ctx->input_tensor) {
+        LOGE("[OmegaMNN-Native] resize_input: Invalid context or uninitialized pointers!");
+        return -1;
+    }
 
+    LOGI("[OmegaMNN-Native] Resizing input tensor to [%d, %d, %d, %d]...", batch, channels, height, width);
     std::vector<int> shape = {batch, channels, height, width};
     ctx->net->resizeTensor(ctx->input_tensor, shape);
     ctx->net->resizeSession(ctx->session);
@@ -97,7 +117,8 @@ OMEGA_EXPORT int omega_mnn_resize_input(
         new MNN::Tensor(ctx->output_tensor, MNN::Tensor::CAFFE)
     );
 
-    LOGI("Resized MNN session to [%d, %d, %d, %d]", batch, channels, height, width);
+    LOGI("[OmegaMNN-Native] Resize complete. Host tensors allocated (input size=%d floats, output size=%d floats)",
+         ctx->host_input->elementSize(), ctx->host_output->elementSize());
     return 0;
 }
 
@@ -106,8 +127,12 @@ OMEGA_EXPORT int omega_mnn_infer(
     const float* input_data, // NHWC float32 [1, H, W, 3]
     float* output_data       // NHWC float32 [1, H*4, W*4, 3]
 ) {
-    if (!ctx || !ctx->net || !ctx->session || !input_data || !output_data) return -1;
+    if (!ctx || !ctx->net || !ctx->session || !input_data || !output_data) {
+        LOGE("[OmegaMNN-Native] infer: Invalid arguments!");
+        return -1;
+    }
     if (!ctx->host_input || !ctx->host_output) {
+        LOGI("[OmegaMNN-Native] infer: host tensors null, performing initial resize to 64x64");
         omega_mnn_resize_input(ctx, 1, 3, 64, 64);
     }
 
@@ -133,7 +158,7 @@ OMEGA_EXPORT int omega_mnn_infer(
     // Execute Neural Network Graph on Vulkan GPU / CPU
     MNN::ErrorCode err = ctx->net->runSession(ctx->session);
     if (err != MNN::NO_ERROR) {
-        LOGE("MNN runSession error: %d", err);
+        LOGE("[OmegaMNN-Native] MNN runSession error code: %d", err);
         return static_cast<int>(err);
     }
 
@@ -150,7 +175,6 @@ OMEGA_EXPORT int omega_mnn_infer(
         for (int x = 0; x < outW; x++) {
             int nhwc_idx = (y * outW + x) * 3;
             int nchw_idx = y * outW + x;
-            // Clamp output to [0..1] range
             output_data[nhwc_idx] = std::max(0.0f, std::min(1.0f, host_out_ptr[nchw_idx]));
             output_data[nhwc_idx + 1] = std::max(0.0f, std::min(1.0f, host_out_ptr[outPlane + nchw_idx]));
             output_data[nhwc_idx + 2] = std::max(0.0f, std::min(1.0f, host_out_ptr[2 * outPlane + nchw_idx]));
@@ -177,11 +201,12 @@ OMEGA_EXPORT int omega_mnn_get_output_shape(
 
 OMEGA_EXPORT void omega_mnn_destroy(OmegaMNNContext* ctx) {
     if (!ctx) return;
+    LOGI("[OmegaMNN-Native] Destroying MNN context...");
     if (ctx->net && ctx->session) {
         ctx->net->releaseSession(ctx->session);
     }
     delete ctx;
-    LOGI("MNN context destroyed cleanly");
+    LOGI("[OmegaMNN-Native] MNN context destroyed cleanly");
 }
 
 }

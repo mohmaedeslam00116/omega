@@ -90,11 +90,13 @@ class UpscalePipeline {
     void Function(double)? onProgress,
     bool Function()? isCancelled,
   ) async {
+    final swTotal = Stopwatch()..start();
     final decoded = img.decodeImage(imageBytes);
     if (decoded == null) throw Exception('Failed to decode image');
 
     final w = decoded.width;
     final h = decoded.height;
+    print('[Omega-Pipeline] Starting upscale: image=${w}x$h, tileSize=$ts, scale=$scale');
 
     // Pre-flight memory guard: refuse the job (with a friendly message)
     // before allocating anything big. Not an OOM — never retried.
@@ -110,6 +112,7 @@ class UpscalePipeline {
     final xs = _positions(w, ts, stride);
     final ys = _positions(h, ts, stride);
     final totalTiles = xs.length * ys.length;
+    print('[Omega-Pipeline] Tiling plan: ${xs.length}x${ys.length} = $totalTiles total tiles (stride=$stride, overlap=${_effectiveOverlap(ts)})');
 
     // Output canvas (flat RGB) + per-pixel coverage weights for the feather.
     final outW = w * scale;
@@ -124,6 +127,7 @@ class UpscalePipeline {
     for (final y in ys) {
       for (final x in xs) {
         if (isCancelled != null && isCancelled()) {
+          print('[Omega-Pipeline] Job cancelled by user at tile $done/$totalTiles');
           throw const UpscaleCancelledException();
         }
         // Full-size source tile (edges clamped; shorter axes padded later by
@@ -153,6 +157,7 @@ class UpscalePipeline {
 
         done++;
         if (onProgress != null) onProgress(done / totalTiles);
+        print('[Omega-Pipeline] Completed tile $done/$totalTiles (${(done / totalTiles * 100).toStringAsFixed(1)}%)');
 
         // Yield to event loop to keep UI responsive (simulates Isolate)
         await Future<void>.delayed(Duration.zero);
@@ -165,6 +170,9 @@ class UpscalePipeline {
       bytes: canvas.buffer,
       numChannels: 3,
     );
-    return Uint8List.fromList(img.encodePng(output));
+    final pngBytes = Uint8List.fromList(img.encodePng(output));
+    swTotal.stop();
+    print('[Omega-Pipeline] Upscale finished in ${swTotal.elapsedMilliseconds}ms (${outW}x$outH, ${pngBytes.length} bytes)');
+    return pngBytes;
   }
 }

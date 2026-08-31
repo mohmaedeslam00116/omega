@@ -237,6 +237,8 @@ class _UpscaleTabState extends State<UpscaleTab> {
       final modelPath = entry.bundled
           ? _bundledAssetPath(entry)
           : await _downloadManager.pathFor(entry);
+      debugPrint('[Omega-UI] Triggering upscale: model=${entry.id}, name="${entry.name}", backend=${entry.backend.name}, bundled=${entry.bundled}');
+      debugPrint('[Omega-UI] Model path: $modelPath, GPU enabled: ${widget.useGpu}');
       final out = await _runner.run(
         _inputBytes!,
         config: UpscaleJobConfig(modelPath: modelPath, useGpu: widget.useGpu),
@@ -245,6 +247,7 @@ class _UpscaleTabState extends State<UpscaleTab> {
         },
         cancelToken: token,
       );
+      debugPrint('[Omega-UI] Upscale completed successfully! Output bytes: ${out.length}');
       if (mounted) {
         setState(() {
           _outputBytes = out;
@@ -252,6 +255,7 @@ class _UpscaleTabState extends State<UpscaleTab> {
         });
       }
     } on UpscaleCancelledException {
+      debugPrint('[Omega-UI] Upscale cancelled by user');
       // Cancelled from the UI — quietly return to the preview state.
       if (mounted) setState(() => _isProcessing = false);
     } catch (e, stack) {

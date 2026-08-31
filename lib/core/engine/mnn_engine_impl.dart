@@ -37,10 +37,13 @@ class MnnEngineImpl implements TfliteEngine {
       try {
         if (Platform.isAndroid) {
           _lib = DynamicLibrary.open('libomega_mnn.so');
+          print('[Omega-MNN] Successfully loaded libomega_mnn.so');
         } else {
           _lib = DynamicLibrary.process();
+          print('[Omega-MNN] Loaded process dynamic library');
         }
-      } catch (_) {
+      } catch (e) {
+        print('[Omega-MNN] Error opening dynamic library: $e');
         _lib = null;
       }
     }
@@ -62,6 +65,7 @@ class MnnEngineImpl implements TfliteEngine {
   @override
   Future<void> setUseGpu(bool useGpu) async {
     _useGpu = useGpu;
+    print('[Omega-MNN] setUseGpu: $useGpu');
     if (isLoaded && _modelPath != null) {
       final path = _modelPath!;
       await close();
@@ -74,8 +78,17 @@ class MnnEngineImpl implements TfliteEngine {
     _modelPath = modelPath;
     if (isLoaded) await close();
 
+    print('[Omega-MNN] Loading model from: $modelPath');
+    final file = File(modelPath);
+    if (await file.exists()) {
+      print('[Omega-MNN] Model file exists on disk, size: ${await file.length()} bytes');
+    } else {
+      print('[Omega-MNN] WARNING: Model file does NOT exist on disk: $modelPath');
+    }
+
     final lib = _dynamicLib;
     if (lib == null) {
+      print('[Omega-MNN] ERROR: libomega_mnn.so is null!');
       throw UnsupportedError(
         'MNN native library (libomega_mnn.so) is not available on this platform.',
       );
@@ -88,10 +101,13 @@ class MnnEngineImpl implements TfliteEngine {
     try {
       // ForwardType: 3 = Vulkan, 2 = OpenCL, 0 = CPU. Precision: 2 = Low (FP16).
       final forwardType = _useGpu ? 3 : 0;
+      print('[Omega-MNN] Calling omega_mnn_create(forwardType=$forwardType, precision=2, threads=4)...');
       _ctx = mnnCreate(pathPtr, forwardType, 2, 4);
+      print('[Omega-MNN] omega_mnn_create returned ctx=$_ctx');
       if (_ctx == null || _ctx == nullptr) {
-        throw StateError('Failed to initialize MNN context for: ');
+        throw StateError('Failed to initialize MNN context for: $modelPath');
       }
+      print('[Omega-MNN] Model loaded and context initialized successfully!');
     } finally {
       calloc.free(pathPtr);
     }
@@ -114,8 +130,10 @@ class MnnEngineImpl implements TfliteEngine {
     }
 
     if (side != _lastSide) {
+      print('[Omega-MNN] Resizing MNN session to side: $side (input shape: [1, 3, $side, $side])');
       final code = mnnResize(ctx, 1, 3, side, side);
-      if (code != 0) throw StateError('Failed to resize MNN session: ');
+      print('[Omega-MNN] mnnResize returned code: $code');
+      if (code != 0) throw StateError('Failed to resize MNN session: $code');
       _lastSide = side;
     }
 
@@ -128,8 +146,16 @@ class MnnEngineImpl implements TfliteEngine {
     try {
       inputPtr.asTypedList(input.length).setAll(0, input);
 
+      final sw = Stopwatch()..start();
       final code = mnnInfer(ctx, inputPtr, outputPtr);
-      if (code != 0) throw StateError('MNN inference failed with code: ');
+      sw.stop();
+
+      if (code != 0) {
+        print('[Omega-MNN] ERROR: mnnInfer failed with code: $code');
+        throw StateError('MNN inference failed with code: $code');
+      }
+
+      print('[Omega-MNN] Tile infer complete: in=${side}x$side -> out=${outSide}x$outSide in ${sw.elapsedMilliseconds}ms');
 
       final result = Float32List(outLength);
       result.setAll(0, outputPtr.asTypedList(outLength));
@@ -144,6 +170,7 @@ class MnnEngineImpl implements TfliteEngine {
   Future<void> close() async {
     final ctx = _ctx;
     if (ctx != null && ctx != nullptr) {
+      print('[Omega-MNN] Closing MNN context: $ctx');
       final lib = _dynamicLib;
       if (lib != null) {
         final mnnDestroy =
@@ -153,6 +180,7 @@ class MnnEngineImpl implements TfliteEngine {
       _ctx = null;
       _lastSide = 0;
       _modelPath = null;
+      print('[Omega-MNN] MNN context closed');
     }
   }
 }
