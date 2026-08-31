@@ -47,8 +47,29 @@ class DownloadManagerImpl implements DownloadManager {
 
   Directory _modelsDir(Directory base) => Directory('${base.path}/models');
 
-  File _fileFor(Directory base, String id) =>
-      File('${_modelsDir(base).path}/$id.tflite');
+  static String extensionFor(CatalogEntry entry) {
+    if (entry.backend == EngineBackend.mnn || entry.url.endsWith('.mnn')) {
+      return '.mnn';
+    }
+    if (entry.backend == EngineBackend.onnx || entry.url.endsWith('.onnx')) {
+      return '.onnx';
+    }
+    return '.tflite';
+  }
+
+  File _fileForEntry(Directory base, CatalogEntry entry) {
+    final ext = extensionFor(entry);
+    return File('${_modelsDir(base).path}/${entry.id}$ext');
+  }
+
+  Future<File?> _findExistingFile(Directory base, String id) async {
+    final dir = _modelsDir(base);
+    for (final ext in ['.tflite', '.mnn', '.onnx']) {
+      final f = File('${dir.path}/$id$ext');
+      if (await f.exists()) return f;
+    }
+    return null;
+  }
 
   @override
   Future<File> download(
@@ -59,7 +80,7 @@ class DownloadManagerImpl implements DownloadManager {
     final base = await _getCacheDir();
     final modelsDir = _modelsDir(base);
     await modelsDir.create(recursive: true);
-    final file = _fileFor(base, entry.id);
+    final file = _fileForEntry(base, entry);
 
     int existing = 0;
     if (await file.exists()) {
@@ -185,8 +206,11 @@ class DownloadManagerImpl implements DownloadManager {
   @override
   Future<void> delete(String id) async {
     final base = await _getCacheDir();
-    final file = _fileFor(base, id);
-    if (await file.exists()) await file.delete();
+    final dir = _modelsDir(base);
+    for (final ext in ['.tflite', '.mnn', '.onnx']) {
+      final file = File('${dir.path}/$id$ext');
+      if (await file.exists()) await file.delete();
+    }
   }
 
   @override
@@ -219,13 +243,13 @@ class DownloadManagerImpl implements DownloadManager {
   @override
   Future<bool> isDownloaded(String id) async {
     final base = await _getCacheDir();
-    final file = _fileFor(base, id);
-    return file.exists();
+    final existing = await _findExistingFile(base, id);
+    return existing != null;
   }
 
   @override
   Future<String> pathFor(CatalogEntry entry) async {
     final base = await _getCacheDir();
-    return _fileFor(base, entry.id).path;
+    return _fileForEntry(base, entry).path;
   }
 }

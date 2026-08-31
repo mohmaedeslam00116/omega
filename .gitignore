@@ -108,4 +108,5 @@ coverage/
 # Agent workspace + local scratch
 .vega/
 .scratch/
+scratch/
 *.log

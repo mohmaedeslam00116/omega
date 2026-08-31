@@ -41,7 +41,7 @@ void main() {
   });
 
   group('DownloadManager', () {
-    test('pathFor returns the local models/<id>.tflite path', () async {
+    test('pathFor returns the local models/<id>.tflite path for TFLite models', () async {
       final entry = _entryForContent('path-test', 'x');
       final mgr = DownloadManagerImpl(
         client: http.Client(),
@@ -49,6 +49,29 @@ void main() {
       );
       final path = await mgr.pathFor(entry);
       expect(path, endsWith('models/path-test.tflite'));
+      expect(path.startsWith(tmp.path), true);
+    });
+
+    test('pathFor returns the local models/<id>.mnn path for MNN models', () async {
+      final entry = CatalogEntry(
+        id: 'realesr-x4plus-int8',
+        name: 'RRDBNet MNN',
+        scale: 4,
+        type: ModelType.general,
+        backend: EngineBackend.mnn,
+        inputSize: 128,
+        fileSize: 10,
+        sha256: 'abc',
+        url: 'https://example.com/RealESRGAN_x4plus_int8.mnn',
+        license: 'BSD-3-Clause',
+        version: '1.0.0',
+      );
+      final mgr = DownloadManagerImpl(
+        client: http.Client(),
+        getCacheDirOverride: () async => tmp,
+      );
+      final path = await mgr.pathFor(entry);
+      expect(path, endsWith('models/realesr-x4plus-int8.mnn'));
       expect(path.startsWith(tmp.path), true);
     });
 

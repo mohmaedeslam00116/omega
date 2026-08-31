@@ -40,6 +40,12 @@ android {
         }
     }
 
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+        }
+    }
+
     buildTypes {
         release {
             // TODO: Add your own signing config for the release build.
