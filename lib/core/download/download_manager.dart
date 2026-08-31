@@ -250,6 +250,23 @@ class DownloadManagerImpl implements DownloadManager {
   @override
   Future<String> pathFor(CatalogEntry entry) async {
     final base = await _getCacheDir();
-    return _fileForEntry(base, entry).path;
+    final expectedFile = _fileForEntry(base, entry);
+    if (!await expectedFile.exists()) {
+      final legacyFile = await _findExistingFile(base, entry.id);
+      if (legacyFile != null && await legacyFile.exists()) {
+        try {
+          if (await legacyFile.length() == entry.fileSize) {
+            await legacyFile.rename(expectedFile.path);
+            print('[DownloadManager] Migrated legacy file ${legacyFile.path} -> ${expectedFile.path}');
+            return expectedFile.path;
+          } else {
+            await legacyFile.delete();
+          }
+        } catch (e) {
+          print('[DownloadManager] Error during legacy file migration: $e');
+        }
+      }
+    }
+    return expectedFile.path;
   }
 }

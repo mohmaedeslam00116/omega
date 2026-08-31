@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -237,6 +238,7 @@ class _UpscaleTabState extends State<UpscaleTab> {
       final modelPath = entry.bundled
           ? _bundledAssetPath(entry)
           : await _downloadManager.pathFor(entry);
+
       debugPrint('[Omega-UI] Triggering upscale: model=${entry.id}, name="${entry.name}", backend=${entry.backend.name}, bundled=${entry.bundled}');
       debugPrint('[Omega-UI] Model path: $modelPath, GPU enabled: ${widget.useGpu}');
       final out = await _runner.run(
