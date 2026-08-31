@@ -37,5 +37,33 @@
     "inputSize": 128,
     "version": "1.0.0",
     "license": "BSD-3-Clause"
+  },
+  {
+    "id": "realesr-x4plus-int8",
+    "name": "Ultra Quality 4× (RRDBNet INT8)",
+    "scale": 4,
+    "type": "general",
+    "backend": "mnn",
+    "inputSize": 128,
+    "fileSize": 17180132,
+    "sha256": "4c9bd6946666a1ec62d622d60847166c31394d6d741d43d5f83eb3ef11e68ab8",
+    "url": "https://github.com/mohmaedeslam00116/omega-models/releases/download/v1.0.0/RealESRGAN_x4plus_int8.mnn",
+    "license": "BSD-3-Clause",
+    "version": "1.0.0",
+    "bundled": false
+  },
+  {
+    "id": "realesr-x4plus-fp16",
+    "name": "Ultra Quality 4× (RRDBNet FP16)",
+    "scale": 4,
+    "type": "general",
+    "backend": "mnn",
+    "inputSize": 128,
+    "fileSize": 33660484,
+    "sha256": "719a4e97ef9780599235f0b9a287f4f51c96e5e20d3a01d89bd093f4ab96731f",
+    "url": "https://github.com/mohmaedeslam00116/omega-models/releases/download/v1.0.0/RealESRGAN_x4plus_fp16.mnn",
+    "license": "BSD-3-Clause",
+    "version": "1.0.0",
+    "bundled": false
   }
 ]
