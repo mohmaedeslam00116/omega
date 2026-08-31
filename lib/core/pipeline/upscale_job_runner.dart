@@ -6,6 +6,7 @@ import 'dart:typed_data';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:path_provider/path_provider.dart';
 
+import '../engine/engine_factory.dart';
 import '../engine/tflite_engine.dart';
 import '../engine/tflite_engine_impl.dart';
 import 'upscale_pipeline.dart';
@@ -181,7 +182,7 @@ Future<Uint8List> _isolateWorker(_WorkerMessage msg) async {
     msg.imageBytes,
     config: msg.config,
     engineFactory: msg.config.engineKind == JobEngineKind.real
-        ? TfliteEngineImpl.new
+        ? () => EngineFactory.createForModel(msg.config.modelPath)
         : TfliteEngineStub.new,
     onProgress: (p) {
       // The final tick is emitted by the caller after completion, so it

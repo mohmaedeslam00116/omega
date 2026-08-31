@@ -2,6 +2,24 @@ import 'dart:convert';
 
 enum ModelType { general, anime, face }
 
+enum EngineBackend { tflite, mnn, onnx }
+
+EngineBackend _backendFromString(String? s, String url) {
+  if (s != null) {
+    switch (s.toLowerCase()) {
+      case 'mnn':
+        return EngineBackend.mnn;
+      case 'onnx':
+        return EngineBackend.onnx;
+      case 'tflite':
+        return EngineBackend.tflite;
+    }
+  }
+  if (url.endsWith('.mnn')) return EngineBackend.mnn;
+  if (url.endsWith('.onnx')) return EngineBackend.onnx;
+  return EngineBackend.tflite;
+}
+
 ModelType _typeFromString(String s) {
   switch (s) {
     case 'general':
@@ -24,6 +42,7 @@ class CatalogEntry {
   final String name;
   final int scale; // e.g., 4
   final ModelType type;
+  final EngineBackend backend;
   final int inputSize; // e.g., 128
   final int fileSize;
   final String sha256;
@@ -37,6 +56,7 @@ class CatalogEntry {
     required this.name,
     required this.scale,
     required this.type,
+    this.backend = EngineBackend.tflite,
     required this.inputSize,
     required this.fileSize,
     required this.sha256,
@@ -67,6 +87,7 @@ class CatalogEntry {
     final scale = json['scale'] as int;
     final inputSize = json['inputSize'] as int;
     final license = json['license'] as String;
+    final url = json['url'] as String;
     if (scale != 4) {
       throw FormatException('Invalid scale $scale, expected 4 for $json');
     }
@@ -82,10 +103,11 @@ class CatalogEntry {
       name: json['name'] as String,
       scale: scale,
       type: _typeFromString(json['type'] as String),
+      backend: _backendFromString(json['backend'] as String?, url),
       inputSize: inputSize,
       fileSize: json['fileSize'] as int,
       sha256: json['sha256'] as String,
-      url: json['url'] as String,
+      url: url,
       license: license,
       version: json['version'] as String,
       bundled: json['bundled'] as bool? ?? false,
@@ -97,6 +119,7 @@ class CatalogEntry {
         'name': name,
         'scale': scale,
         'type': _typeToString(type),
+        'backend': backend.name,
         'inputSize': inputSize,
         'fileSize': fileSize,
         'sha256': sha256,

@@ -117,5 +117,51 @@ void main() {
         throwsA(isA<FormatException>()),
       );
     });
+
+    test('infers and parses backend correctly', () {
+      final tfliteEntry = CatalogEntry.fromJson({
+        'id': 'x',
+        'name': 'n',
+        'scale': 4,
+        'type': 'general',
+        'inputSize': 128,
+        'fileSize': 1,
+        'sha256': 'abc',
+        'url': 'https://example.com/model.tflite',
+        'license': 'BSD-3-Clause',
+        'version': '1'
+      });
+      expect(tfliteEntry.backend, EngineBackend.tflite);
+
+      final mnnEntry = CatalogEntry.fromJson({
+        'id': 'x',
+        'name': 'n',
+        'scale': 4,
+        'type': 'general',
+        'inputSize': 128,
+        'fileSize': 1,
+        'sha256': 'abc',
+        'url': 'https://example.com/model.mnn',
+        'license': 'BSD-3-Clause',
+        'version': '1'
+      });
+      expect(mnnEntry.backend, EngineBackend.mnn);
+
+      final explicitMnnEntry = CatalogEntry.fromJson({
+        'id': 'x',
+        'name': 'n',
+        'scale': 4,
+        'type': 'general',
+        'backend': 'mnn',
+        'inputSize': 128,
+        'fileSize': 1,
+        'sha256': 'abc',
+        'url': 'https://example.com/model.bin',
+        'license': 'BSD-3-Clause',
+        'version': '1'
+      });
+      expect(explicitMnnEntry.backend, EngineBackend.mnn);
+      expect(explicitMnnEntry.toJson()['backend'], 'mnn');
+    });
   });
 }
