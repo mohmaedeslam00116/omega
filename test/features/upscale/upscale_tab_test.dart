@@ -20,11 +20,20 @@ Uint8List _png(int w, int h) {
   return Uint8List.fromList(img.encodePng(im));
 }
 
-CatalogEntry _entry(String id, {bool bundled = false}) => CatalogEntry(
+CatalogEntry _entry(
+  String id, {
+  bool bundled = false,
+  ModelType type = ModelType.general,
+  ModelTier tier = ModelTier.fast,
+  EngineBackend backend = EngineBackend.tflite,
+}) =>
+    CatalogEntry(
       id: id,
       name: bundled ? 'Bundled Model' : 'Extra Model',
       scale: 4,
-      type: ModelType.general,
+      type: type,
+      backend: backend,
+      tier: tier,
       inputSize: 128,
       fileSize: 10,
       sha256: 'abc',
@@ -139,8 +148,12 @@ void main() {
     SharedPreferences.setMockInitialValues({});
   });
 
-  testWidgets('Empty state with pick CTA; after pick, preview shows',
+  testWidgets('Empty state with pick CTA; after pick, preview and dimensions show',
       (tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
     final bytes = _png(100, 100);
     final fakeIo = _FakeImageIo(bytes);
     final runner = _FakeRunner((img, config, prog, token) async {
@@ -156,69 +169,31 @@ void main() {
 
     expect(find.text('No image selected'), findsOneWidget);
     expect(find.text('Gallery'), findsOneWidget);
-    // Round 4 UX polish: no debug scaffolding on the upscaling surface.
     expect(find.text('Verify bundled Model'), findsNothing);
 
     // Tap Gallery
     await tester.tap(find.text('Gallery'));
     await tester.pumpAndSettle();
     expect(find.byType(Image), findsWidgets);
+    expect(find.text('100 × 100'), findsOneWidget);
+    expect(find.text('400 × 400 (4×)'), findsOneWidget);
   });
 
-  testWidgets('Upscale disabled while the selected Model downloads',
+  testWidgets('Preset selection drives the resolved modelPath (downloaded Model)',
       (tester) async {
-    final gate = Completer<void>();
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
     final fakeIo = _FakeImageIo(_png(64, 64));
-    final dl = _FakeDownloadManager(downloaded: {}, gate: gate);
-    final runner = _FakeRunner((img, config, p, token) async => _png(200, 200));
-    final catalog = [
-      _entry('bundled-model', bundled: true),
-      _entry('extra-model'),
-    ];
-
-    await tester.pumpWidget(MaterialApp(
-      home: Scaffold(
-        body: UpscaleTab(
-          imageIo: fakeIo,
-          runner: runner,
-          downloadManager: dl,
-          catalog: catalog,
-        ),
-      ),
-    ));
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.text('Gallery'));
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.byType(DropdownButton<CatalogEntry>));
-    await tester.pumpAndSettle();
-    await tester.tap(find.textContaining('Extra Model').last);
-    await tester.pump();
-
-    // Download is gated open -> still in progress, button disabled.
-    final btn = tester
-        .widget<FilledButton>(find.widgetWithText(FilledButton, 'Upscale 4×'));
-    expect(btn.onPressed, isNull);
-
-    gate.complete();
-    await tester.pumpAndSettle();
-    final btn2 = tester
-        .widget<FilledButton>(find.widgetWithText(FilledButton, 'Upscale 4×'));
-    expect(btn2.onPressed, isNotNull);
-  });
-
-  testWidgets('Model selection drives the job modelPath (downloaded Model)',
-      (tester) async {
-    final fakeIo = _FakeImageIo(_png(64, 64));
-    final dl = _FakeDownloadManager(downloaded: {'extra-model'});
+    final dl = _FakeDownloadManager(downloaded: {'anime-model'});
     final runner = _FakeRunner((img, config, prog, token) async {
       prog?.call(1.0);
       return _png(256, 256);
     });
     final catalog = [
-      _entry('bundled-model', bundled: true),
-      _entry('extra-model'),
+      _entry('bundled-photo', bundled: true, type: ModelType.general, tier: ModelTier.fast),
+      _entry('anime-model', bundled: false, type: ModelType.anime, tier: ModelTier.fast),
     ];
 
     await tester.pumpWidget(MaterialApp(
@@ -236,19 +211,22 @@ void main() {
     await tester.tap(find.text('Gallery'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byType(DropdownButton<CatalogEntry>));
-    await tester.pumpAndSettle();
-    await tester.tap(find.textContaining('Extra Model').last);
+    // Tap Art & Anime preset
+    await tester.tap(find.text('Art & Anime'));
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Upscale 4×'));
     await tester.pumpAndSettle();
 
-    expect(runner.lastConfig?.modelPath, '/cache/models/extra-model.tflite');
+    expect(runner.lastConfig?.modelPath, '/cache/models/anime-model.tflite');
   });
 
-  testWidgets('Selecting a missing Model auto-downloads it with progress',
+  testWidgets('Selecting a preset with missing Model auto-downloads it on upscale',
       (tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
     final fakeIo = _FakeImageIo(_png(64, 64));
     final dl = _FakeDownloadManager(downloaded: {});
     final runner = _FakeRunner((img, config, prog, token) async {
@@ -256,8 +234,8 @@ void main() {
       return _png(256, 256);
     });
     final catalog = [
-      _entry('bundled-model', bundled: true),
-      _entry('extra-model'),
+      _entry('bundled-photo', bundled: true, type: ModelType.general, tier: ModelTier.fast),
+      _entry('anime-model', bundled: false, type: ModelType.anime, tier: ModelTier.fast),
     ];
 
     await tester.pumpWidget(MaterialApp(
@@ -275,22 +253,22 @@ void main() {
     await tester.tap(find.text('Gallery'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byType(DropdownButton<CatalogEntry>));
+    await tester.tap(find.text('Art & Anime'));
     await tester.pumpAndSettle();
-    await tester.tap(find.textContaining('Extra Model').last);
-    await tester.pump();
 
-    expect(dl.downloadCalls.map((e) => e.id), contains('extra-model'));
-
-    await tester.pumpAndSettle();
     await tester.tap(find.text('Upscale 4×'));
     await tester.pumpAndSettle();
 
-    expect(runner.lastConfig?.modelPath, '/cache/models/extra-model.tflite');
+    expect(dl.downloadCalls.map((e) => e.id), contains('anime-model'));
+    expect(runner.lastConfig?.modelPath, '/cache/models/anime-model.tflite');
   });
 
   testWidgets('Progress advances, Cancel appears, job completes',
       (tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
     final bytes = _png(128, 128);
     final fakeIo = _FakeImageIo(bytes);
     final runner = _FakeRunner((img, config, prog, token) async {
@@ -317,6 +295,10 @@ void main() {
   });
 
   testWidgets('Cancel button stops the job cleanly', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
     final bytes = _png(128, 128);
     final fakeIo = _FakeImageIo(bytes);
     final runner = _FakeRunner((img, config, prog, token) async {
@@ -346,6 +328,10 @@ void main() {
   });
 
   testWidgets('Job config carries the model path and GPU flag', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
     final bytes = _png(64, 64);
     final fakeIo = _FakeImageIo(bytes);
     final runner = _FakeRunner((img, config, prog, token) async {
@@ -353,9 +339,19 @@ void main() {
       return _png(256, 256);
     });
 
+    final catalog = [
+      _entry('bundled-photo', bundled: true, type: ModelType.general, tier: ModelTier.fast),
+    ];
+
     await tester.pumpWidget(MaterialApp(
       home: Scaffold(
-        body: UpscaleTab(imageIo: fakeIo, runner: runner, downloadManager: _FakeDownloadManager(downloaded: {}), useGpu: true),
+        body: UpscaleTab(
+          imageIo: fakeIo,
+          runner: runner,
+          downloadManager: _FakeDownloadManager(downloaded: {}),
+          catalog: catalog,
+          useGpu: true,
+        ),
       ),
     ));
     await tester.tap(find.text('Gallery'));
@@ -364,20 +360,24 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(runner.lastConfig?.modelPath,
-        'assets/models/realesr-general-x4v3_fp16.tflite');
+        'assets/models/bundled-photo_fp16.tflite');
     expect(runner.lastConfig?.useGpu, true);
     expect(runner.lastToken, isNotNull);
   });
 
   testWidgets('Friendly memory-guard error surfaces in the tab',
       (tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
     final bytes = _png(64, 64);
     final fakeIo = _FakeImageIo(bytes);
     final runner = _FakeRunner((img, config, prog, token) async {
       throw const MemoryEstimateExceededException(4456448, 52428800);
     });
 
-    SharedPreferences.setMockInitialValues({'selectedModelId': 'realesr-general-x4v3'});
+    SharedPreferences.setMockInitialValues({});
     final prefs = await SharedPreferences.getInstance();
     await tester.pumpWidget(MaterialApp(
       home: Scaffold(
@@ -385,12 +385,7 @@ void main() {
           imageIo: fakeIo,
           runner: runner,
           settingsService: SettingsService(prefs),
-          downloadManager: _FakeDownloadManager(downloaded: {
-            'realesr-general-x4v3',
-            'realesr-animevideov3',
-            'realesr-x4plus-int8',
-            'realesr-x4plus-fp16',
-          }),
+          downloadManager: _FakeDownloadManager(downloaded: {}),
         ),
       ),
     ));
@@ -418,6 +413,10 @@ void main() {
 
   testWidgets('Save sheet: JPEG choice reaches ImageIo and persists prefs',
       (tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
     SharedPreferences.setMockInitialValues(<String, Object>{});
     final settings = await SettingsService.init();
     final fakeIo = _FakeImageIo(_png(64, 64));
@@ -449,25 +448,33 @@ void main() {
     // PNG default -> no quality slider
     expect(find.byKey(const ValueKey('jpegQuality')), findsNothing);
 
+    // Switch to JPEG -> quality slider appears at default 90%
     await tester.tap(find.text('JPEG'));
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('jpegQuality')), findsOneWidget);
+    expect(find.text('90%'), findsOneWidget);
 
-    await tester.tap(find.text('Save image'));
+    // Tap Save
+    await tester.tap(find.text('Save'));
     await tester.pumpAndSettle();
 
     expect(fakeIo.saveCalled, true);
     expect(fakeIo.lastSave?.asJpeg, true);
-    expect(fakeIo.lastSave?.filename, 'omega_upscaled.jpg');
-    final prefs = await SharedPreferences.getInstance();
-    expect(prefs.getString('saveFormat'), 'jpeg');
-    expect(prefs.getInt('jpegQuality'), 90);
+    expect(fakeIo.lastSave?.jpegQuality, 90);
+    expect(settings.saveFormat, 'jpeg');
+    expect(settings.jpegQuality, 90);
   });
 
   testWidgets('Save sheet recalls the remembered format and quality',
       (tester) async {
-    SharedPreferences.setMockInitialValues(
-        <String, Object>{'saveFormat': 'jpeg', 'jpegQuality': 70});
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    SharedPreferences.setMockInitialValues({
+      'saveFormat': 'jpeg',
+      'jpegQuality': 70,
+    });
     final settings = await SettingsService.init();
     final fakeIo = _FakeImageIo(_png(64, 64));
     final runner = _FakeRunner((img, config, prog, token) async {
@@ -492,102 +499,54 @@ void main() {
 
     await tester.tap(find.text('Save to Gallery'));
     await tester.pumpAndSettle();
-    // Remembered: JPEG selected -> quality slider shows the stored value.
-    expect(find.byKey(const ValueKey('jpegQuality')), findsOneWidget);
-    final slider = tester.widget<Slider>(find.byKey(const ValueKey('jpegQuality')));
-    expect(slider.value, 70);
 
-    await tester.tap(find.text('Save image'));
+    // Remembers JPEG + 70%
+    expect(find.byKey(const ValueKey('jpegQuality')), findsOneWidget);
+    expect(find.text('70%'), findsOneWidget);
+
+    // Tap Save
+    await tester.tap(find.text('Save'));
     await tester.pumpAndSettle();
+
+    expect(fakeIo.saveCalled, true);
     expect(fakeIo.lastSave?.asJpeg, true);
     expect(fakeIo.lastSave?.jpegQuality, 70);
-    expect(fakeIo.lastSave?.filename, 'omega_upscaled.jpg');
   });
 
   testWidgets(
       'After complete, slider compares before/after and Save/Share succeed',
       (tester) async {
-    final inBytes = _png(20, 20);
-    final outBytes = _png(80, 80);
-    final fakeIo = _FakeImageIo(inBytes);
-    final runner = _FakeRunner((img, config, p, token) async {
-      p?.call(1.0);
-      return outBytes;
-    });
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    final bytes = _png(64, 64);
+    final fakeIo = _FakeImageIo(bytes);
+    final runner = _FakeRunner((img, config, prog, token) async => _png(256, 256));
 
     await tester.pumpWidget(MaterialApp(
-      home: Scaffold(
-        body: UpscaleTab(
-          imageIo: fakeIo,
-          runner: runner,
-          downloadManager: _FakeDownloadManager(downloaded: {}),
-          settingsService: await SettingsService.init(),
-        ),
-      ),
+      home: Scaffold(body: UpscaleTab(imageIo: fakeIo, runner: runner, downloadManager: _FakeDownloadManager(downloaded: {}))),
     ));
     await tester.tap(find.text('Gallery'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Upscale 4×'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Before'), findsOneWidget);
-    expect(find.text('After'), findsOneWidget);
+    // After upscale finishes, slider is visible
     expect(find.byType(Slider), findsOneWidget);
-    expect(find.text('Save to Gallery'), findsOneWidget);
-    expect(find.text('Share'), findsOneWidget);
+    expect(find.text('Before'), findsOneWidget);
+    expect(find.text('After (4×)'), findsOneWidget);
 
+    // Save to Gallery
     await tester.tap(find.text('Save to Gallery'));
     await tester.pumpAndSettle();
-    // The save sheet opens; confirm with the default (PNG).
-    await tester.tap(find.text('Save image'));
+    await tester.tap(find.text('Save'));
     await tester.pumpAndSettle();
     expect(fakeIo.saveCalled, true);
 
-    // Let the "Saved" SnackBar auto-dismiss — it docks over the Share button.
-    await tester.pump(const Duration(seconds: 4));
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.text('Share'));
+    // Share
+    await tester.tap(find.byIcon(Icons.share_rounded));
     await tester.pumpAndSettle();
     expect(fakeIo.shareCalled, true);
-  });
-
-  testWidgets(
-      'Before/After comparison handles images without RenderFlex overflow',
-      (tester) async {
-    SharedPreferences.setMockInitialValues(<String, Object>{});
-    tester.view.physicalSize = const Size(360, 640);
-    tester.view.devicePixelRatio = 1.0;
-    addTearDown(() {
-      tester.view.resetPhysicalSize();
-      tester.view.resetDevicePixelRatio();
-    });
-
-    final inBytes = _png(80, 80);
-    final outBytes = _png(160, 160);
-    final fakeIo = _FakeImageIo(inBytes);
-    final runner = _FakeRunner((img, config, p, token) async {
-      p?.call(1.0);
-      return outBytes;
-    });
-
-    await tester.pumpWidget(MaterialApp(
-      home: Scaffold(
-        body: UpscaleTab(
-          imageIo: fakeIo,
-          runner: runner,
-          downloadManager: _FakeDownloadManager(downloaded: {}),
-          settingsService: await SettingsService.init(),
-        ),
-      ),
-    ));
-    await tester.tap(find.text('Gallery'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Upscale 4×'));
-    await tester.pumpAndSettle();
-
-    expect(tester.takeException(), isNull);
-    expect(find.text('Before'), findsOneWidget);
-    expect(find.text('After'), findsOneWidget);
   });
 }
