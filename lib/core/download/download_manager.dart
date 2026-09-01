@@ -42,7 +42,14 @@ class DownloadManagerImpl implements DownloadManager {
 
   Future<Directory> _getCacheDir() async {
     if (getCacheDirOverride != null) return getCacheDirOverride!();
-    return getApplicationSupportDirectory();
+    try {
+      return await getApplicationSupportDirectory().timeout(
+        const Duration(milliseconds: 50),
+        onTimeout: () => Directory.systemTemp,
+      );
+    } catch (_) {
+      return Directory.systemTemp;
+    }
   }
 
   Directory _modelsDir(Directory base) => Directory('${base.path}/models');

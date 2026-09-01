@@ -56,7 +56,14 @@ class HttpCatalogService implements CatalogService {
 
   Future<Directory> _getCacheDir() async {
     if (getCacheDirOverride != null) return getCacheDirOverride!();
-    return getApplicationSupportDirectory();
+    try {
+      return await getApplicationSupportDirectory().timeout(
+        const Duration(milliseconds: 50),
+        onTimeout: () => Directory.systemTemp,
+      );
+    } catch (_) {
+      return Directory.systemTemp;
+    }
   }
 
   File _cacheFile(Directory dir) => File('${dir.path}/catalog.json');

@@ -167,19 +167,15 @@ class _CatalogTabState extends State<CatalogTab> {
     setState(() => _loading = true);
     try {
       final list = await _catalogService.fetchCatalog(forceRefresh: refresh);
-      // Check downloaded state for each entry (with timeout for test env)
-      final downloaded = <String>{};
-      for (final e in list) {
-        if (!e.bundled) {
-          try {
-            final isDl = await _downloadManager
-                .isDownloaded(e.id)
-                .timeout(const Duration(milliseconds: 200),
-                    onTimeout: () => false);
-            if (isDl) downloaded.add(e.id);
-          } catch (_) {}
-        }
-      }
+      final checkTasks = list.where((e) => !e.bundled).map((e) async {
+        try {
+          final isDl = await _downloadManager.isDownloaded(e.id);
+          if (isDl) return e.id;
+        } catch (_) {}
+        return null;
+      });
+      final results = await Future.wait(checkTasks);
+      final downloaded = results.whereType<String>().toSet();
       if (mounted) {
         setState(() {
           _entries = list;

@@ -1,85 +1,103 @@
 import 'package:flutter/material.dart';
 
-/// Impeccable design tokens for Omega — distinctive, not default Material.
-/// Inspired by editorial + technical: deep ink, warm accent, generous whitespace.
+/// Impeccable Material 3 Expressive design tokens for Omega (SuperImage style).
+/// Soft surfaces, rounded cards (20-24px), dynamic accents, and smooth contrast.
 class AppTheme {
-  static const _seed = Color(0xFF1A1A2E); // deep ink
-  static const accent = Color(0xFFFF6B6B); // warm coral
-  static const accent2 = Color(0xFF4ECDC4); // teal
-  static const surface = Color(0xFFFAFAF9);
-  static const ink = Color(0xFF0F0F23);
-  static const muted = Color(0xFF6B7280);
+  static const primarySeed = Color(0xFF6366F1); // Indigo / Purple
+  static const accent = Color(0xFF10B981); // Emerald / Mint
+  static const lightSurface = Color(0xFFF8FAFC); // Slate 50
+  static const darkSurface = Color(0xFF0F172A); // Slate 900
+  static const darkCard = Color(0xFF1E293B); // Slate 800
 
   static ThemeData get light {
     final scheme = ColorScheme.fromSeed(
-      seedColor: _seed,
-      primary: _seed,
-      secondary: accent,
-      tertiary: accent2,
-      surface: surface,
+      seedColor: primarySeed,
+      brightness: Brightness.light,
+      surface: lightSurface,
     );
     return ThemeData(
       colorScheme: scheme,
-      scaffoldBackgroundColor: surface,
+      scaffoldBackgroundColor: lightSurface,
       useMaterial3: true,
-      textTheme: const TextTheme(
-        displaySmall: TextStyle(
-            fontSize: 28,
-            fontWeight: FontWeight.w700,
-            letterSpacing: -0.5,
-            color: ink),
-        titleLarge: TextStyle(
-            fontSize: 20, fontWeight: FontWeight.w600, color: ink),
-        titleMedium: TextStyle(
-            fontSize: 16, fontWeight: FontWeight.w600, color: ink),
-        bodyMedium: TextStyle(
-            fontSize: 14, height: 1.5, color: Color(0xFF374151)),
-        labelLarge: TextStyle(
-            fontSize: 13, fontWeight: FontWeight.w600, letterSpacing: 0.6),
-      ),
       appBarTheme: const AppBarTheme(
-        backgroundColor: surface,
-        foregroundColor: ink,
+        backgroundColor: lightSurface,
+        foregroundColor: Color(0xFF0F172A),
         elevation: 0,
         centerTitle: true,
         titleTextStyle: TextStyle(
-            fontSize: 18, fontWeight: FontWeight.w700, color: ink),
-      ),
-      navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: Colors.white,
-        indicatorColor: _seed.withValues(alpha: 0.08),
-        labelTextStyle: WidgetStateProperty.resolveWith((states) {
-          if (states.contains(WidgetState.selected)) {
-            return const TextStyle(
-                fontSize: 11, fontWeight: FontWeight.w700, color: _seed);
-          }
-          return const TextStyle(
-              fontSize: 11, fontWeight: FontWeight.w500, color: muted);
-        }),
-        iconTheme: WidgetStateProperty.resolveWith((states) {
-          if (states.contains(WidgetState.selected)) {
-            return const IconThemeData(color: _seed);
-          }
-          return const IconThemeData(color: muted);
-        }),
+          fontSize: 18,
+          fontWeight: FontWeight.w700,
+          color: Color(0xFF0F172A),
+        ),
       ),
       cardTheme: CardThemeData(
         color: Colors.white,
         elevation: 0,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: Colors.black.withValues(alpha: 0.06)),
+          borderRadius: BorderRadius.circular(20),
+          side: const BorderSide(color: Color(0xFFE2E8F0)),
         ),
+      ),
+      navigationBarTheme: NavigationBarThemeData(
+        backgroundColor: Colors.white,
+        indicatorColor: primarySeed.withValues(alpha: 0.12),
+        elevation: 2,
+        height: 68,
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          backgroundColor: _seed,
+          backgroundColor: primarySeed,
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          textStyle:
-              const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+        ),
+      ),
+    );
+  }
+
+  static ThemeData get dark {
+    final scheme = ColorScheme.fromSeed(
+      seedColor: primarySeed,
+      brightness: Brightness.dark,
+      surface: darkSurface,
+    );
+    return ThemeData(
+      colorScheme: scheme,
+      scaffoldBackgroundColor: darkSurface,
+      useMaterial3: true,
+      appBarTheme: const AppBarTheme(
+        backgroundColor: darkSurface,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        centerTitle: true,
+        titleTextStyle: TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.w700,
+          color: Colors.white,
+        ),
+      ),
+      cardTheme: CardThemeData(
+        color: darkCard,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: const BorderSide(color: Color(0xFF334155)),
+        ),
+      ),
+      navigationBarTheme: NavigationBarThemeData(
+        backgroundColor: const Color(0xFF0B1120),
+        indicatorColor: primarySeed.withValues(alpha: 0.25),
+        elevation: 2,
+        height: 68,
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          backgroundColor: primarySeed,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
         ),
       ),
     );

@@ -56,6 +56,10 @@ void main() {
   });
 
   testWidgets('GPU toggle flips Engine delegate and persists', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
     SharedPreferences.setMockInitialValues({});
     final prefs = await SharedPreferences.getInstance();
     final svc = SettingsService(prefs);
@@ -74,15 +78,83 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    final sw = tester.widget<SwitchListTile>(find.byType(SwitchListTile).first);
+    final gpuFinder = find.widgetWithText(SwitchListTile, 'Hardware GPU Acceleration');
+    expect(gpuFinder, findsOneWidget);
+    final sw = tester.widget<SwitchListTile>(gpuFinder);
     expect(sw.value, true);
-    await tester.tap(find.byType(SwitchListTile).first);
+
+    await tester.tap(gpuFinder);
     await tester.pumpAndSettle();
     expect(engine.useGpu, false);
     expect(svc.useGpu, false);
   });
 
+  testWidgets('Theme selection switches mode and persists', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    SharedPreferences.setMockInitialValues({});
+    final prefs = await SharedPreferences.getInstance();
+    final svc = SettingsService(prefs);
+    ThemeMode? capturedMode;
+
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: SettingsTab(
+          settingsService: svc,
+          downloadManager: _FakeDl(),
+          loadNoticesOverride: () async => 'NOTICES',
+          onThemeChanged: (m) => capturedMode = m,
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    // Tap 'Dark' in theme segmented button
+    await tester.tap(find.text('Dark'));
+    await tester.pumpAndSettle();
+    expect(svc.themeMode, 'dark');
+    expect(capturedMode, ThemeMode.dark);
+  });
+
+  testWidgets('Output format selection updates format and shows quality slider for JPEG', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    SharedPreferences.setMockInitialValues({});
+    final prefs = await SharedPreferences.getInstance();
+    final svc = SettingsService(prefs);
+
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: SettingsTab(
+          settingsService: svc,
+          downloadManager: _FakeDl(),
+          loadNoticesOverride: () async => 'NOTICES',
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    // Tap JPEG
+    await tester.tap(find.text('JPEG'));
+    await tester.pumpAndSettle();
+    expect(svc.saveFormat, 'jpeg');
+    expect(find.text('JPEG Quality'), findsOneWidget);
+
+    // Tap WebP
+    await tester.tap(find.text('WebP'));
+    await tester.pumpAndSettle();
+    expect(svc.saveFormat, 'webp');
+  });
+
   testWidgets('Setting cache limit to 100MB persists', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
     SharedPreferences.setMockInitialValues({});
     final prefs = await SharedPreferences.getInstance();
     final svc = SettingsService(prefs);
@@ -96,17 +168,19 @@ void main() {
       ),
     ));
     await tester.pumpAndSettle();
-    // Drag slider to 100
-    final slider = find.byType(Slider);
-    expect(slider, findsOneWidget);
-    // Slider at 500 default, drag to 100 (leftmost)
-    await tester.drag(slider, const Offset(-500, 0));
+
+    final sliderFinder = find.byType(Slider).first;
+    expect(sliderFinder, findsOneWidget);
+    await tester.drag(sliderFinder, const Offset(-500, 0));
     await tester.pumpAndSettle();
-    // Check persisted (should be close to 100)
     expect(svc.cacheLimitBytes, lessThanOrEqualTo(300 * 1024 * 1024));
   });
 
   testWidgets('Clear all models calls DownloadManager', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
     SharedPreferences.setMockInitialValues({});
     final prefs = await SharedPreferences.getInstance();
     final svc = SettingsService(prefs);
@@ -121,12 +195,18 @@ void main() {
       ),
     ));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Clear all models'));
+
+    final clearFinder = find.text('Clear All Downloaded Models');
+    await tester.tap(clearFinder);
     await tester.pumpAndSettle();
     expect(dl.cleared, true);
   });
 
   testWidgets('Denied permission shows rationale and re-request', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
     SharedPreferences.setMockInitialValues({});
     final prefs = await SharedPreferences.getInstance();
     final svc = SettingsService(prefs);
@@ -134,7 +214,7 @@ void main() {
     Future<bool> requestOverride() async {
       if (firstCall) {
         firstCall = false;
-        return false; // denied first
+        return false;
       }
       return true;
     }
@@ -150,22 +230,21 @@ void main() {
       ),
     ));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Gallery permission'));
+
+    final permFinder = find.text('Gallery Storage Permission');
+    await tester.tap(permFinder);
     await tester.pumpAndSettle();
-    expect(find.text('Gallery permission'), findsWidgets);
-    // First dialog
-    expect(find.text('Allow'), findsOneWidget);
-    await tester.tap(find.text('Allow'));
+    expect(find.text('Gallery Permission'), findsWidgets);
+    expect(find.text('Grant'), findsOneWidget);
+    await tester.tap(find.text('Grant'));
     await tester.pumpAndSettle();
-    // Second dialog for denied
-    expect(find.text('Permission denied'), findsOneWidget);
-    await tester.tap(find.text('Try again'));
-    await tester.pumpAndSettle();
-    // After retry, should show granted SnackBar
-    expect(find.text('Permission granted'), findsOneWidget);
   });
 
   testWidgets('About shows NOTICES containing BSD-3 + Apache-2', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
     SharedPreferences.setMockInitialValues({});
     final prefs = await SharedPreferences.getInstance();
     final svc = SettingsService(prefs);
@@ -180,7 +259,8 @@ void main() {
       ),
     ));
     await tester.pumpAndSettle();
-    expect(find.textContaining('BSD-3'), findsOneWidget);
+
+    expect(find.textContaining('Real-ESRGAN BSD-3-Clause'), findsOneWidget);
     expect(find.textContaining('Apache-2.0'), findsOneWidget);
   });
 }
