@@ -72,9 +72,22 @@ _Avoid_: QAT, fine-tuning, retraining
 Algebraic fusion of multi-branch training architectures (1×1 + 3×3 + identity + edge filters) into a single plain 3×3 convolution at export time, eliminating branch overhead on mobile GPUs.
 _Avoid_: model pruning, layer merging
 
+### HumanFriendlyPreset
+User-facing high-level intent configuration (Content Type: `Photos 🖼️` vs `Art & Anime 🎨` + Quality Tier: `⚡ Lightning` vs `💎 Ultra Quality`) that automatically maps to the optimal on-device Model without exposing confusing neural network jargon.
+_Avoid_: model selector, engine picker
+
+### ComparisonSlider
+Interactive Before/After split-screen viewer widget supporting real-time horizontal drag divider and synchronized two-finger pinch-to-zoom & panning across original and upscaled images.
+_Avoid_: split view, diff viewer
+
+### BatchQueue
+An ordered sequence of user-selected images processed sequentially in the background with individual and aggregate progress telemetry.
+_Avoid_: job list, bulk task
+
 ## Notes
 - Architecture: Pluggable Multi-Engine (ADR-0008) routing models to `MnnEngineImpl` or `TfliteEngineImpl`.
 - Memory & Performance: Adaptive Tiling (ADR-0009) with dynamic overlap feathering and runtime OOM fallback.
 - Security & Privacy: 100% on-device local processing, zero network transmission of user images, cryptographic SHA256 download verification.
-- Design: `impeccable` UI — distinctive, intentional, tokens-driven dark theme with before/after slider and format-remembering save sheet.
+- Design: SuperImage-inspired Material 3 Expressive UI (ADR-0012) — 3-tab navigation (`Upscale`, `Models`, `Settings`), HumanFriendlyPresets, ComparisonSlider, and streaming Gallery saving for large 4000px+ images.
 - Edge Research: OmegaEdge (ADR-0011) — separate GPL-3.0 repo for compression research, hybrid integration with Omega via model artifacts.
+

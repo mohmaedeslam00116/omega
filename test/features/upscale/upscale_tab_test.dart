@@ -78,6 +78,9 @@ class _FakeImageIo implements ImageIoService {
   @override
   Future<Uint8List?> pickFromGallery() async => toReturn;
   @override
+  Future<List<Uint8List>> pickMultipleFromGallery() async =>
+      toReturn != null ? [toReturn!] : [];
+  @override
   Future<Uint8List?> pickFromCamera() async => toReturn;
   @override
   Future<Uint8List?> getInitialSharedImage() async => null;
@@ -89,11 +92,12 @@ class _FakeImageIo implements ImageIoService {
   Future<String> saveToGallery(Uint8List bytes,
       {String? filename,
       bool asJpeg = false,
-      int jpegQuality = 90}) async {
+      int jpegQuality = 90,
+      OutputImageFormat format = OutputImageFormat.png}) async {
     saveCalled = true;
     lastSave = (
       filename: filename ?? 'a.png',
-      asJpeg: asJpeg,
+      asJpeg: asJpeg || format == OutputImageFormat.jpeg,
       jpegQuality: jpegQuality
     );
     return 'gallery:${filename ?? 'a.png'}';

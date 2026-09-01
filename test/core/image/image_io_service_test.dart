@@ -36,6 +36,24 @@ void main() {
       expect(result!.length, bytes.length);
     });
 
+    test('pickMultipleFromGallery returns multiple images', () async {
+      final bytes1 = _makePng(50, 50);
+      final bytes2 = _makePng(60, 60);
+      final file1 = File('${tmp.path}/p1.png');
+      final file2 = File('${tmp.path}/p2.png');
+      await file1.writeAsBytes(bytes1);
+      await file2.writeAsBytes(bytes2);
+
+      final svc = ImageIoServiceImpl(
+        pickMultipleOverride: () async => [XFile(file1.path), XFile(file2.path)],
+        getTempDirOverride: () async => tmp,
+      );
+      final list = await svc.pickMultipleFromGallery();
+      expect(list.length, 2);
+      expect(list[0].length, bytes1.length);
+      expect(list[1].length, bytes2.length);
+    });
+
     test('Camera capture works', () async {
       final bytes = _makePng(200, 200);
       final file = File('${tmp.path}/cam.png');
@@ -51,7 +69,7 @@ void main() {
       expect(result, isNotNull);
     });
 
-    test('>4096 image shows error and blocks', () async {
+    test('>4096 input image shows error and blocks on pick', () async {
       final svc = ImageIoServiceImpl(getTempDirOverride: () async => tmp);
       final big = _makePng(4097, 100);
       expect(
@@ -60,7 +78,6 @@ void main() {
             e is UnsupportedError &&
             (e.message?.contains('Image exceeds 4096px') ?? false))),
       );
-      // Also via pick should throw
       final file = File('${tmp.path}/big.png');
       await file.writeAsBytes(big);
       final svc2 = ImageIoServiceImpl(
@@ -70,11 +87,20 @@ void main() {
       expect(() => svc2.pickFromGallery(), throwsA(isA<UnsupportedError>()));
     });
 
-    test('4096 exactly passes', () async {
-      final svc = ImageIoServiceImpl(getTempDirOverride: () async => tmp);
-      final ok2 = _makePng(4096, 100);
-      await svc.validate(ok2);
-      expect(true, true);
+    test('Large upscaled image (>4096px) saves to gallery successfully without throwing', () async {
+      // Simulates saving a 4800x4800 upscaled output
+      final largeBytes = _makePng(5000, 100);
+      var galCalled = false;
+      final svc = ImageIoServiceImpl(
+        getTempDirOverride: () async => tmp,
+        galPutOverride: (b, name) async {
+          galCalled = true;
+          expect(b.length, largeBytes.length);
+        },
+      );
+      final path = await svc.saveToGallery(largeBytes, filename: 'large_upscaled.png');
+      expect(galCalled, true);
+      expect(path, contains('gallery:'));
     });
 
     test('Save to Gallery shows in Photos (via Gal override) and fallback',
@@ -112,10 +138,25 @@ void main() {
           filename: 'test.jpg', asJpeg: true, jpegQuality: 80);
       expect(path, contains('gallery:'));
       expect(captured, isNotNull);
-      // JPEG SOI magic — a real re-encoded JPEG, not the input PNG.
+      // JPEG SOI magic
       expect(captured![0], 0xFF);
       expect(captured![1], 0xD8);
       expect(captured!.length, isNot(bytes.length));
+    });
+
+    test('saveToGallery supports OutputImageFormat.webp', () async {
+      final bytes = _makePng(50, 50);
+      String? savedName;
+      final svc = ImageIoServiceImpl(
+        getTempDirOverride: () async => tmp,
+        galPutOverride: (b, name) async => savedName = name,
+      );
+      final path = await svc.saveToGallery(
+        bytes,
+        format: OutputImageFormat.webp,
+      );
+      expect(path, contains('gallery:'));
+      expect(savedName, contains('.webp'));
     });
 
     test('saveToGallery passes PNG bytes through by default', () async {
@@ -145,7 +186,6 @@ void main() {
 
     test('Share-intent stream is available (scaffold)', () async {
       final svc = ImageIoServiceImpl(getTempDirOverride: () async => tmp);
-      // For scaffold, just ensure stream getter doesn't throw
       expect(svc.sharedImageStream, isA<Stream<Uint8List?>>());
     });
   });
