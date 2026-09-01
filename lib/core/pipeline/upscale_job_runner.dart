@@ -29,7 +29,7 @@ class UpscaleJobConfig {
 
   const UpscaleJobConfig({
     required this.modelPath,
-    this.useGpu = false,
+    this.useGpu = true,
     this.tileSize = 128,
     this.overlap = 36,
     this.scale = 4,

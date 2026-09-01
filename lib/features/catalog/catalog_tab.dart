@@ -31,7 +31,7 @@ class _CatalogTabState extends State<CatalogTab> {
   String _tierLabel(ModelTier tier) {
     switch (tier) {
       case ModelTier.fast:
-        return '⚡ Fast';
+        return '⚡ Ultra Fast';
       case ModelTier.balanced:
         return '⚖️ Balanced';
       case ModelTier.quality:

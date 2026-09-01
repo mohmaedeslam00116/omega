@@ -97,12 +97,17 @@ class MnnEngineImpl implements TfliteEngine {
     final mnnCreate =
         lib.lookupFunction<_MnnCreateNative, _MnnCreateDart>('omega_mnn_create');
 
+    const int kMnnForwardCpu = 0;
+    const int kMnnForwardVulkan = 3;
+    const int kMnnPrecisionLowFp16 = 2;
+    const int kMnnDefaultThreads = 4;
+
     final pathPtr = modelPath.toNativeUtf8();
     try {
-      // ForwardType: 3 = Vulkan, 2 = OpenCL, 0 = CPU. Precision: 2 = Low (FP16).
-      final forwardType = _useGpu ? 3 : 0;
-      print('[Omega-MNN] Calling omega_mnn_create(forwardType=$forwardType, precision=2, threads=4)...');
-      _ctx = mnnCreate(pathPtr, forwardType, 2, 4);
+      final forwardType = _useGpu ? kMnnForwardVulkan : kMnnForwardCpu;
+      print(
+          '[Omega-MNN] Calling omega_mnn_create(forwardType=$forwardType, precision=$kMnnPrecisionLowFp16, threads=$kMnnDefaultThreads)...');
+      _ctx = mnnCreate(pathPtr, forwardType, kMnnPrecisionLowFp16, kMnnDefaultThreads);
       print('[Omega-MNN] omega_mnn_create returned ctx=$_ctx');
       if (_ctx == null || _ctx == nullptr) {
         throw StateError('Failed to initialize MNN context for: $modelPath');

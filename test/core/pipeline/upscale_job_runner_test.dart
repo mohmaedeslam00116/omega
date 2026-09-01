@@ -19,7 +19,7 @@ void main() {
     test('carries modelPath + useGpu with sane defaults', () {
       const config = UpscaleJobConfig(modelPath: 'assets/m.tflite');
       expect(config.modelPath, 'assets/m.tflite');
-      expect(config.useGpu, false);
+      expect(config.useGpu, true);
       expect(config.tileSize, 128);
       expect(config.overlap, 36);
       expect(config.scale, 4);

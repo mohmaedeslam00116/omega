@@ -16,7 +16,7 @@ class UpscaleTab extends StatefulWidget {
   final UpscaleJobRunner? runner;
   final DownloadManager? downloadManager;
   final SettingsService? settingsService;
-  final bool useGpu;
+  final bool? useGpu;
   final List<CatalogEntry>? catalog;
 
   const UpscaleTab({
@@ -25,7 +25,7 @@ class UpscaleTab extends StatefulWidget {
     this.runner,
     this.downloadManager,
     this.settingsService,
-    this.useGpu = false,
+    this.useGpu,
     this.catalog,
   });
 
@@ -258,11 +258,14 @@ class _UpscaleTabState extends State<UpscaleTab> {
           ? _bundledAssetPath(entry)
           : await _downloadManager.pathFor(entry);
 
-      debugPrint('[Omega-UI] Triggering upscale: model=${entry.id}, name="${entry.name}", backend=${entry.backend.name}, bundled=${entry.bundled}');
-      debugPrint('[Omega-UI] Model path: $modelPath, GPU enabled: ${widget.useGpu}');
+      final effectiveGpu =
+          widget.settingsService?.useGpu ?? widget.useGpu ?? true;
+      debugPrint(
+          '[Omega-UI] Triggering upscale: model=${entry.id}, name="${entry.name}", backend=${entry.backend.name}, bundled=${entry.bundled}');
+      debugPrint('[Omega-UI] Model path: $modelPath, GPU enabled: $effectiveGpu');
       final out = await _runner.run(
         _inputBytes!,
-        config: UpscaleJobConfig(modelPath: modelPath, useGpu: widget.useGpu),
+        config: UpscaleJobConfig(modelPath: modelPath, useGpu: effectiveGpu),
         onProgress: (p) {
           if (mounted) setState(() => _progress = p);
         },
@@ -374,7 +377,8 @@ class _UpscaleTabState extends State<UpscaleTab> {
                   ),
                 ),
                 Chip(
-                  label: const Text('TFLite • 4×'),
+                  label: Text(
+                      '${_selected?.backend.name.toUpperCase() ?? "TFLITE"} • ${_selected?.scale ?? 4}×'),
                   backgroundColor: const Color(0xFFFFF0F0),
                   labelStyle: theme.textTheme.labelLarge?.copyWith(
                       color: const Color(0xFF9A3412), fontSize: 11),
