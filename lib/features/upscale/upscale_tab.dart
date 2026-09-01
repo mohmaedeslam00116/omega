@@ -12,6 +12,8 @@ import '../../core/pipeline/upscale_job_runner.dart';
 import '../../core/pipeline/upscale_pipeline.dart';
 import '../../core/preset/human_friendly_preset.dart';
 import '../../core/settings/settings_service.dart';
+import 'models/batch_item.dart';
+import 'widgets/batch_queue_carousel.dart';
 import 'widgets/comparison_slider.dart';
 
 class UpscaleTab extends StatefulWidget {
@@ -42,17 +44,13 @@ class _UpscaleTabState extends State<UpscaleTab> {
   late final DownloadManager _downloadManager;
   late List<CatalogEntry> _catalog;
 
-  Uint8List? _inputBytes;
-  Uint8List? _outputBytes;
-  int? _inputWidth;
-  int? _inputHeight;
-  int? _inputSizeBytes;
+  // Batch Queue
+  final List<BatchItem> _batchItems = [];
+  int _selectedBatchIndex = 0;
 
   bool _isProcessing = false;
   double _progress = 0;
   String? _error;
-  double _slider = 0.5;
-  Duration? _lastDuration;
   CancelToken? _activeToken;
   SettingsService? _settings;
 
@@ -65,6 +63,17 @@ class _UpscaleTabState extends State<UpscaleTab> {
   final Set<String> _downloadedIds = {};
   String? _downloadingId;
   double? _downloadProgress;
+
+  BatchItem? get _currentBatchItem {
+    if (_batchItems.isEmpty) return null;
+    if (_selectedBatchIndex >= _batchItems.length) {
+      _selectedBatchIndex = 0;
+    }
+    return _batchItems[_selectedBatchIndex];
+  }
+
+  Uint8List? get _inputBytes => _currentBatchItem?.inputBytes;
+  Uint8List? get _outputBytes => _currentBatchItem?.outputBytes;
 
   @override
   void initState() {
@@ -212,32 +221,51 @@ class _UpscaleTabState extends State<UpscaleTab> {
     }
   }
 
-  void _setImageBytes(Uint8List? bytes) {
-    _inputBytes = bytes;
-    _outputBytes = null;
-    _error = null;
-    _progress = 0;
-    if (bytes != null) {
-      _inputSizeBytes = bytes.lengthInBytes;
+  void _addImages(List<Uint8List> images) {
+    if (images.isEmpty) return;
+    for (final bytes in images) {
+      int? w;
+      int? h;
       try {
-        final decoded = img.decodeImage(bytes);
-        if (decoded != null) {
-          _inputWidth = decoded.width;
-          _inputHeight = decoded.height;
+        final dec = img.decodeImage(bytes);
+        if (dec != null) {
+          w = dec.width;
+          h = dec.height;
         }
       } catch (_) {}
-    } else {
-      _inputWidth = null;
-      _inputHeight = null;
-      _inputSizeBytes = null;
+
+      final item = BatchItem(
+        id: UniqueKey().toString(),
+        inputBytes: bytes,
+        inputWidth: w,
+        inputHeight: h,
+      );
+      _batchItems.add(item);
+    }
+    _selectedBatchIndex = _batchItems.length - images.length;
+    _error = null;
+    setState(() {});
+  }
+
+  void _removeBatchItem(String id) {
+    _batchItems.removeWhere((item) => item.id == id);
+    if (_selectedBatchIndex >= _batchItems.length) {
+      _selectedBatchIndex = (_batchItems.length - 1).clamp(0, 99999);
     }
     setState(() {});
   }
 
   Future<void> _pickImage() async {
     try {
-      final bytes = await _imageIo.pickFromGallery();
-      if (bytes != null) _setImageBytes(bytes);
+      final multi = await _imageIo.pickMultipleFromGallery();
+      if (multi.isNotEmpty) {
+        _addImages(multi);
+        return;
+      }
+      final single = await _imageIo.pickFromGallery();
+      if (single != null) {
+        _addImages([single]);
+      }
     } catch (e) {
       setState(() => _error = 'Failed to pick image: $e');
     }
@@ -246,14 +274,14 @@ class _UpscaleTabState extends State<UpscaleTab> {
   Future<void> _pickCamera() async {
     try {
       final bytes = await _imageIo.pickFromCamera();
-      if (bytes != null) _setImageBytes(bytes);
+      if (bytes != null) _addImages([bytes]);
     } catch (e) {
       setState(() => _error = 'Failed to pick image from camera: $e');
     }
   }
 
   Future<void> _upscale() async {
-    if (_inputBytes == null) return;
+    if (_batchItems.isEmpty) return;
     _resolveSelectedModel();
     final selected = _selected;
     if (selected == null) {
@@ -300,7 +328,6 @@ class _UpscaleTabState extends State<UpscaleTab> {
       _isProcessing = true;
       _progress = 0;
       _error = null;
-      _outputBytes = null;
     });
 
     final token = CancelToken();
@@ -319,30 +346,55 @@ class _UpscaleTabState extends State<UpscaleTab> {
         useGpu: useGpu,
       );
 
-      final stopwatch = Stopwatch()..start();
-      final out = await _runner.run(
-        _inputBytes!,
-        config: config,
-        onProgress: (p) {
-          if (mounted && !token.isCancelled) {
-            setState(() => _progress = p);
+      // Process batch items sequentially
+      for (var i = 0; i < _batchItems.length; i++) {
+        if (token.isCancelled) break;
+        final item = _batchItems[i];
+        if (item.status == BatchItemStatus.completed && item.outputBytes != null) {
+          continue;
+        }
+
+        setState(() {
+          _selectedBatchIndex = i;
+          item.status = BatchItemStatus.processing;
+          _progress = 0;
+        });
+
+        final stopwatch = Stopwatch()..start();
+        final out = await _runner.run(
+          item.inputBytes,
+          config: config,
+          onProgress: (p) {
+            if (mounted && !token.isCancelled) {
+              setState(() {
+                _progress = p;
+                item.progress = p;
+              });
+            }
+          },
+          cancelToken: token,
+        );
+        stopwatch.stop();
+
+        if (!token.isCancelled) {
+          setState(() {
+            item.outputBytes = out;
+            item.duration = stopwatch.elapsed;
+            item.status = BatchItemStatus.completed;
+            item.progress = 1.0;
+          });
+
+          if (_settings?.autoSave ?? false) {
+            _autoSave(out);
           }
-        },
-        cancelToken: token,
-      );
-      stopwatch.stop();
+        }
+      }
 
       if (mounted && !token.isCancelled) {
         setState(() {
-          _outputBytes = out;
-          _lastDuration = stopwatch.elapsed;
           _isProcessing = false;
           _progress = 1.0;
         });
-
-        if (_settings?.autoSave ?? false) {
-          _autoSave(out);
-        }
       }
     } catch (e) {
       if (mounted) {
@@ -350,6 +402,9 @@ class _UpscaleTabState extends State<UpscaleTab> {
         setState(() {
           _isProcessing = false;
           _error = token.isCancelled ? null : errText;
+          if (_currentBatchItem != null && _currentBatchItem!.status == BatchItemStatus.processing) {
+            _currentBatchItem!.status = BatchItemStatus.failed;
+          }
         });
         if (!token.isCancelled) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -398,6 +453,7 @@ class _UpscaleTabState extends State<UpscaleTab> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     _resolveSelectedModel();
+    final current = _currentBatchItem;
 
     return SafeArea(
       child: ListView(
@@ -414,10 +470,12 @@ class _UpscaleTabState extends State<UpscaleTab> {
                 ),
               ),
               const Spacer(),
-              if (_inputBytes != null)
+              if (_batchItems.isNotEmpty)
                 IconButton(
-                  tooltip: 'Clear image',
-                  onPressed: _isProcessing ? null : () => _setImageBytes(null),
+                  tooltip: 'Clear all',
+                  onPressed: _isProcessing
+                      ? null
+                      : () => setState(() => _batchItems.clear()),
                   icon: const Icon(Icons.refresh_rounded),
                 ),
             ],
@@ -426,10 +484,22 @@ class _UpscaleTabState extends State<UpscaleTab> {
 
           // 1. Hero Image Container
           _buildHeroCard(theme),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
+
+          // Batch Queue Carousel (visible when items present)
+          if (_batchItems.length > 1) ...[
+            BatchQueueCarousel(
+              items: _batchItems,
+              selectedIndex: _selectedBatchIndex,
+              onSelect: (idx) => setState(() => _selectedBatchIndex = idx),
+              onAddMore: _pickImage,
+              onRemove: _removeBatchItem,
+            ),
+            const SizedBox(height: 16),
+          ],
 
           // 2. 2D Preset Selection (Content Type & Quality)
-          if (_outputBytes == null) ...[
+          if (current == null || current.outputBytes == null) ...[
             _buildContentTypeSelector(theme),
             const SizedBox(height: 16),
             _buildQualityTierSelector(theme),
@@ -470,20 +540,22 @@ class _UpscaleTabState extends State<UpscaleTab> {
   }
 
   Widget _buildHeroCard(ThemeData theme) {
-    if (_outputBytes != null && _inputBytes != null) {
+    final current = _currentBatchItem;
+
+    if (current != null && current.outputBytes != null) {
       return ComparisonSlider(
-        beforeBytes: _inputBytes!,
-        afterBytes: _outputBytes!,
-        inputWidth: _inputWidth,
-        inputHeight: _inputHeight,
-        duration: _lastDuration,
+        beforeBytes: current.inputBytes,
+        afterBytes: current.outputBytes!,
+        inputWidth: current.inputWidth,
+        inputHeight: current.inputHeight,
+        duration: current.duration,
         onSave: () => _showSaveModal(context),
-        onShare: () => _imageIo.shareImage(_outputBytes!),
-        onNewImage: () => _setImageBytes(null),
+        onShare: () => _imageIo.shareImage(current.outputBytes!),
+        onNewImage: () => setState(() => _batchItems.clear()),
       );
     }
 
-    if (_inputBytes != null) {
+    if (current != null) {
       // Selected Image Hero Preview
       return Container(
         height: 280,
@@ -496,11 +568,11 @@ class _UpscaleTabState extends State<UpscaleTab> {
           alignment: Alignment.center,
           children: [
             Positioned.fill(
-              child: Image.memory(_inputBytes!, fit: BoxFit.contain),
+              child: Image.memory(current.inputBytes, fit: BoxFit.contain),
             ),
             Positioned(
               bottom: 12,
-              child: _buildDimensionsBadge(theme),
+              child: _buildDimensionsBadge(theme, current),
             ),
           ],
         ),
@@ -542,7 +614,7 @@ class _UpscaleTabState extends State<UpscaleTab> {
             ),
             const SizedBox(height: 6),
             Text(
-              'Select an image to upscale with high-performance AI',
+              'Select one or more images to upscale with high-performance AI',
               textAlign: TextAlign.center,
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
@@ -571,11 +643,11 @@ class _UpscaleTabState extends State<UpscaleTab> {
     );
   }
 
-  Widget _buildDimensionsBadge(ThemeData theme) {
-    if (_inputWidth == null || _inputHeight == null) return const SizedBox.shrink();
-    final outW = _inputWidth! * 4;
-    final outH = _inputHeight! * 4;
-    final sizeKb = ((_inputSizeBytes ?? 0) / 1024).toStringAsFixed(1);
+  Widget _buildDimensionsBadge(ThemeData theme, BatchItem item) {
+    if (item.inputWidth == null || item.inputHeight == null) return const SizedBox.shrink();
+    final outW = item.inputWidth! * 4;
+    final outH = item.inputHeight! * 4;
+    final sizeKb = (item.inputBytes.lengthInBytes / 1024).toStringAsFixed(1);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
@@ -589,7 +661,7 @@ class _UpscaleTabState extends State<UpscaleTab> {
           const Icon(Icons.aspect_ratio, size: 16, color: Colors.white),
           const SizedBox(width: 8),
           Text(
-            '$_inputWidth × $_inputHeight',
+            '${item.inputWidth} × ${item.inputHeight}',
             style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
           ),
           const Padding(
@@ -689,11 +761,14 @@ class _UpscaleTabState extends State<UpscaleTab> {
   }
 
   Widget _buildActionSection(ThemeData theme) {
-    if (_outputBytes != null) {
+    final current = _currentBatchItem;
+    if (current != null && current.outputBytes != null) {
       return const SizedBox.shrink();
     }
 
     if (_isProcessing) {
+      final total = _batchItems.length;
+      final currentIdx = _selectedBatchIndex + 1;
       return Column(
         children: [
           LinearProgressIndicator(value: _progress > 0 ? _progress : null),
@@ -702,7 +777,9 @@ class _UpscaleTabState extends State<UpscaleTab> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Upscaling... ${(_progress * 100).toStringAsFixed(0)}%',
+                total > 1
+                    ? 'Upscaling $currentIdx/$total (${(_progress * 100).toStringAsFixed(0)}%)'
+                    : 'Upscaling... ${(_progress * 100).toStringAsFixed(0)}%',
                 style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
               ),
               TextButton(
@@ -729,15 +806,19 @@ class _UpscaleTabState extends State<UpscaleTab> {
       );
     }
 
+    final btnLabel = _batchItems.length > 1
+        ? 'Upscale All (${_batchItems.length})'
+        : 'Upscale 4×';
+
     return SizedBox(
       width: double.infinity,
       height: 52,
       child: FilledButton.icon(
-        onPressed: _inputBytes == null ? null : _upscale,
+        onPressed: _batchItems.isEmpty ? null : _upscale,
         icon: const Icon(Icons.auto_awesome_rounded),
-        label: const Text(
-          'Upscale 4×',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+        label: Text(
+          btnLabel,
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
         ),
       ),
     );
@@ -793,13 +874,15 @@ class _UpscaleTabState extends State<UpscaleTab> {
                 FilledButton(
                   onPressed: () async {
                     Navigator.pop(ctx);
+                    final outBytes = _outputBytes;
+                    if (outBytes == null) return;
                     final outFmt = format == 'jpeg'
                         ? OutputImageFormat.jpeg
                         : format == 'webp'
                             ? OutputImageFormat.webp
                             : OutputImageFormat.png;
                     await _imageIo.saveToGallery(
-                      _outputBytes!,
+                      outBytes,
                       asJpeg: format == 'jpeg',
                       jpegQuality: quality,
                       format: outFmt,
