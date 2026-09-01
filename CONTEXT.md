@@ -60,8 +60,21 @@ _Avoid_: glue, mosaic, paste
 A single, cancellable upscale operation with progress reporting, executed in a fresh background Isolate.
 _Avoid_: upscale task, job queue
 
+### OmegaEdge
+A separate GPL-3.0 research repository (`omega-edge`) focused on making heavy super-resolution models run efficiently on low-end ARM Mali GPUs without training. Produces optimized Models (`.mnn`) that feed into the Omega Catalog, and a standalone C++ inference engine.
+_Avoid_: omega-core, turbo engine
+
+### PostTrainingQuantization (PTQ)
+Weight and activation compression applied to a pre-trained Model without re-training (INT8, W4A8, FP16). The only quantization path available when no training GPU exists.
+_Avoid_: QAT, fine-tuning, retraining
+
+### StructuralReParameterization
+Algebraic fusion of multi-branch training architectures (1×1 + 3×3 + identity + edge filters) into a single plain 3×3 convolution at export time, eliminating branch overhead on mobile GPUs.
+_Avoid_: model pruning, layer merging
+
 ## Notes
 - Architecture: Pluggable Multi-Engine (ADR-0008) routing models to `MnnEngineImpl` or `TfliteEngineImpl`.
 - Memory & Performance: Adaptive Tiling (ADR-0009) with dynamic overlap feathering and runtime OOM fallback.
 - Security & Privacy: 100% on-device local processing, zero network transmission of user images, cryptographic SHA256 download verification.
 - Design: `impeccable` UI — distinctive, intentional, tokens-driven dark theme with before/after slider and format-remembering save sheet.
+- Edge Research: OmegaEdge (ADR-0011) — separate GPL-3.0 repo for compression research, hybrid integration with Omega via model artifacts.

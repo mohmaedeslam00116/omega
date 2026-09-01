@@ -23,6 +23,27 @@ struct OmegaMNNContext {
     int scale = 4;
 };
 
+#include <dlfcn.h>
+
+static void ensure_gpu_backends_loaded() {
+    static bool loaded = false;
+    if (!loaded) {
+        void* h_vk = dlopen("libMNN_Vulkan.so", RTLD_NOW | RTLD_GLOBAL);
+        if (h_vk) {
+            LOGI("[OmegaMNN-Native] Successfully loaded libMNN_Vulkan.so!");
+        } else {
+            LOGI("[OmegaMNN-Native] dlopen libMNN_Vulkan.so note: %s", dlerror());
+        }
+        void* h_cl = dlopen("libMNN_CL.so", RTLD_NOW | RTLD_GLOBAL);
+        if (h_cl) {
+            LOGI("[OmegaMNN-Native] Successfully loaded libMNN_CL.so!");
+        } else {
+            LOGI("[OmegaMNN-Native] dlopen libMNN_CL.so note: %s", dlerror());
+        }
+        loaded = true;
+    }
+}
+
 extern "C" {
 
 OMEGA_EXPORT OmegaMNNContext* omega_mnn_create(
@@ -35,6 +56,7 @@ OMEGA_EXPORT OmegaMNNContext* omega_mnn_create(
         LOGE("[OmegaMNN-Native] model_path is NULL!");
         return nullptr;
     }
+    ensure_gpu_backends_loaded();
     LOGI("[OmegaMNN-Native] Creating MNN Interpreter for: %s (forwardType: %d, precision: %d, threads: %d)",
          model_path, forward_type, precision_mode, num_threads);
 
@@ -48,7 +70,8 @@ OMEGA_EXPORT OmegaMNNContext* omega_mnn_create(
     }
 
     MNN::ScheduleConfig config;
-    config.type = static_cast<MNNForwardType>(forward_type); // 3 = Vulkan, 2 = OpenCL, 0 = CPU
+    config.type = static_cast<MNNForwardType>(forward_type); // 7 = Vulkan, 3 = OpenCL, 4 = Auto, 0 = CPU
+    config.backupType = MNN_FORWARD_CPU;
     config.numThread = num_threads > 0 ? num_threads : 4;
     config.mode = MNN_GPU_TUNING_WIDE;
 

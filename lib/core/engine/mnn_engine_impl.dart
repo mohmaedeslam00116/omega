@@ -98,7 +98,9 @@ class MnnEngineImpl implements TfliteEngine {
         lib.lookupFunction<_MnnCreateNative, _MnnCreateDart>('omega_mnn_create');
 
     const int kMnnForwardCpu = 0;
-    const int kMnnForwardVulkan = 3;
+    const int kMnnForwardOpenCl = 3;
+    const int kMnnForwardAuto = 4;
+    const int kMnnForwardVulkan = 7;
     const int kMnnPrecisionLowFp16 = 2;
     const int kMnnDefaultThreads = 4;
 

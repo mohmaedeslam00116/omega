@@ -329,14 +329,13 @@ class _CatalogTabState extends State<CatalogTab> {
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
+                                      Text(
+                                        e.name,
+                                        style: theme.textTheme.titleMedium,
+                                      ),
+                                      const SizedBox(height: 4),
                                       Row(
                                         children: [
-                                          Expanded(
-                                            child: Text(e.name,
-                                                style: theme.textTheme
-                                                    .titleMedium),
-                                          ),
-                                          const SizedBox(width: 6),
                                           Container(
                                             padding: const EdgeInsets.symmetric(
                                                 horizontal: 6, vertical: 2),
@@ -349,7 +348,7 @@ class _CatalogTabState extends State<CatalogTab> {
                                               _tierLabel(e.tier),
                                               style: theme.textTheme.labelLarge
                                                   ?.copyWith(
-                                                fontSize: 9,
+                                                fontSize: 10,
                                                 fontWeight: FontWeight.w600,
                                                 color: _tierFg(e.tier),
                                               ),
@@ -358,7 +357,7 @@ class _CatalogTabState extends State<CatalogTab> {
                                           const SizedBox(width: 6),
                                           Container(
                                             padding: const EdgeInsets.symmetric(
-                                                horizontal: 8, vertical: 4),
+                                                horizontal: 8, vertical: 2),
                                             decoration: BoxDecoration(
                                               color: badgeBg,
                                               borderRadius:
