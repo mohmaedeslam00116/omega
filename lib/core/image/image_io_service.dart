@@ -116,11 +116,6 @@ class ImageIoServiceImpl implements ImageIoService {
     if (decoded == null) {
       throw Exception('Failed to decode image');
     }
-    // Only guard against extreme input image sizes that exceed tile indexing limits
-    if (decoded.width > 4096 || decoded.height > 4096) {
-      throw UnsupportedError(
-          'Image exceeds 4096px, please crop or choose smaller');
-    }
   }
 
   @override

@@ -69,22 +69,19 @@ void main() {
       expect(result, isNotNull);
     });
 
-    test('>4096 input image shows error and blocks on pick', () async {
+    test('Large input image (>4096px) validates and picks successfully', () async {
       final svc = ImageIoServiceImpl(getTempDirOverride: () async => tmp);
       final big = _makePng(4097, 100);
-      expect(
-        () => svc.validate(big),
-        throwsA(predicate((e) =>
-            e is UnsupportedError &&
-            (e.message?.contains('Image exceeds 4096px') ?? false))),
-      );
+      await svc.validate(big); // does not throw
+
       final file = File('${tmp.path}/big.png');
       await file.writeAsBytes(big);
       final svc2 = ImageIoServiceImpl(
         pickOverride: (_) async => XFile(file.path),
         getTempDirOverride: () async => tmp,
       );
-      expect(() => svc2.pickFromGallery(), throwsA(isA<UnsupportedError>()));
+      final res = await svc2.pickFromGallery();
+      expect(res, isNotNull);
     });
 
     test('Large upscaled image (>4096px) saves to gallery successfully without throwing', () async {

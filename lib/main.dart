@@ -57,7 +57,7 @@ class _OmegaAppState extends State<OmegaApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Omega Super-Resolution',
+      title: 'Omega Upscaler',
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
       themeMode: _themeMode,

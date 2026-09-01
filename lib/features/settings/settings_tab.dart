@@ -402,7 +402,7 @@ class _SettingsTabState extends State<SettingsTab> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    '100% On-Device AI Super-Resolution powered by Alibaba MNN Vulkan GPU & Google TFLite.',
+                    '100% On-Device AI Upscaler powered by Alibaba MNN Vulkan GPU & Google TFLite.',
                     style: theme.textTheme.bodyMedium,
                   ),
                   const SizedBox(height: 12),
