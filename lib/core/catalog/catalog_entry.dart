@@ -6,6 +6,41 @@ enum EngineBackend { tflite, mnn, onnx }
 
 enum ModelTier { fast, balanced, quality }
 
+extension ModelTierPresentation on ModelTier {
+  String get label {
+    switch (this) {
+      case ModelTier.fast:
+        return '⚡ Ultra Fast';
+      case ModelTier.balanced:
+        return '⚖️ Balanced';
+      case ModelTier.quality:
+        return '💎 Ultra Quality';
+    }
+  }
+
+  int get bgColorValue {
+    switch (this) {
+      case ModelTier.fast:
+        return 0xFFFEF3C7;
+      case ModelTier.balanced:
+        return 0xFFE0E7FF;
+      case ModelTier.quality:
+        return 0xFFF3E8FF;
+    }
+  }
+
+  int get fgColorValue {
+    switch (this) {
+      case ModelTier.fast:
+        return 0xFF92400E;
+      case ModelTier.balanced:
+        return 0xFF3730A3;
+      case ModelTier.quality:
+        return 0xFF6B21A8;
+    }
+  }
+}
+
 EngineBackend _backendFromString(String? s, String url) {
   if (s != null) {
     switch (s.toLowerCase()) {

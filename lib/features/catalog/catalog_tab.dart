@@ -28,38 +28,7 @@ class _CatalogTabState extends State<CatalogTab> {
   final Map<String, double> _progress = {};
   final Set<String> _downloaded = {};
 
-  String _tierLabel(ModelTier tier) {
-    switch (tier) {
-      case ModelTier.fast:
-        return '⚡ Ultra Fast';
-      case ModelTier.balanced:
-        return '⚖️ Balanced';
-      case ModelTier.quality:
-        return '💎 Ultra Quality';
-    }
-  }
 
-  Color _tierBg(ModelTier tier) {
-    switch (tier) {
-      case ModelTier.fast:
-        return const Color(0xFFFEF3C7);
-      case ModelTier.balanced:
-        return const Color(0xFFE0E7FF);
-      case ModelTier.quality:
-        return const Color(0xFFF3E8FF);
-    }
-  }
-
-  Color _tierFg(ModelTier tier) {
-    switch (tier) {
-      case ModelTier.fast:
-        return const Color(0xFF92400E);
-      case ModelTier.balanced:
-        return const Color(0xFF3730A3);
-      case ModelTier.quality:
-        return const Color(0xFF6B21A8);
-    }
-  }
 
   @override
   void initState() {
@@ -340,17 +309,17 @@ class _CatalogTabState extends State<CatalogTab> {
                                             padding: const EdgeInsets.symmetric(
                                                 horizontal: 6, vertical: 2),
                                             decoration: BoxDecoration(
-                                              color: _tierBg(e.tier),
+                                              color: Color(e.tier.bgColorValue),
                                               borderRadius:
                                                   BorderRadius.circular(12),
                                             ),
                                             child: Text(
-                                              _tierLabel(e.tier),
+                                              e.tier.label,
                                               style: theme.textTheme.labelLarge
                                                   ?.copyWith(
                                                 fontSize: 10,
                                                 fontWeight: FontWeight.w600,
-                                                color: _tierFg(e.tier),
+                                                color: Color(e.tier.fgColorValue),
                                               ),
                                             ),
                                           ),
