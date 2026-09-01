@@ -16,9 +16,7 @@ void main() {
 
     // Tap Catalog tab
     await tester.tap(find.text('Catalog').last);
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
-    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pumpAndSettle();
     expect(find.text('General Photo 4×'), findsWidgets);
 
     // Back to Upscale

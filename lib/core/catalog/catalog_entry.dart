@@ -4,6 +4,8 @@ enum ModelType { general, anime, face }
 
 enum EngineBackend { tflite, mnn, onnx }
 
+enum ModelTier { fast, balanced, quality }
+
 EngineBackend _backendFromString(String? s, String url) {
   if (s != null) {
     switch (s.toLowerCase()) {
@@ -18,6 +20,23 @@ EngineBackend _backendFromString(String? s, String url) {
   if (url.endsWith('.mnn')) return EngineBackend.mnn;
   if (url.endsWith('.onnx')) return EngineBackend.onnx;
   return EngineBackend.tflite;
+}
+
+ModelTier _tierFromString(String? s, int fileSize) {
+  if (s != null) {
+    switch (s.toLowerCase()) {
+      case 'fast':
+        return ModelTier.fast;
+      case 'balanced':
+        return ModelTier.balanced;
+      case 'quality':
+      case 'ultra_quality':
+        return ModelTier.quality;
+    }
+  }
+  if (fileSize < 4 * 1024 * 1024) return ModelTier.fast;
+  if (fileSize < 12 * 1024 * 1024) return ModelTier.balanced;
+  return ModelTier.quality;
 }
 
 ModelType _typeFromString(String s) {
@@ -36,13 +55,14 @@ ModelType _typeFromString(String s) {
 String _typeToString(ModelType t) => t.name;
 
 /// Immutable CatalogEntry describing a downloadable Model.
-/// Mirrors ADRs 0002 & 0004 and CONTEXT.md CatalogEntry term.
+/// Mirrors ADRs 0002 & 0004 & 0010 and CONTEXT.md CatalogEntry term.
 class CatalogEntry {
   final String id;
   final String name;
   final int scale; // e.g., 4
   final ModelType type;
   final EngineBackend backend;
+  final ModelTier tier;
   final int inputSize; // e.g., 128
   final int fileSize;
   final String sha256;
@@ -57,6 +77,7 @@ class CatalogEntry {
     required this.scale,
     required this.type,
     this.backend = EngineBackend.tflite,
+    this.tier = ModelTier.balanced,
     required this.inputSize,
     required this.fileSize,
     required this.sha256,
@@ -98,14 +119,16 @@ class CatalogEntry {
     if (license.isEmpty) {
       throw FormatException('License must not be empty for $json');
     }
+    final fileSize = json['fileSize'] as int;
     return CatalogEntry(
       id: json['id'] as String,
       name: json['name'] as String,
       scale: scale,
       type: _typeFromString(json['type'] as String),
       backend: _backendFromString(json['backend'] as String?, url),
+      tier: _tierFromString(json['tier'] as String?, fileSize),
       inputSize: inputSize,
-      fileSize: json['fileSize'] as int,
+      fileSize: fileSize,
       sha256: json['sha256'] as String,
       url: url,
       license: license,
@@ -120,6 +143,7 @@ class CatalogEntry {
         'scale': scale,
         'type': _typeToString(type),
         'backend': backend.name,
+        'tier': tier.name,
         'inputSize': inputSize,
         'fileSize': fileSize,
         'sha256': sha256,

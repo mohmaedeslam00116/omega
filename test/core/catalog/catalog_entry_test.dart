@@ -163,5 +163,51 @@ void main() {
       expect(explicitMnnEntry.backend, EngineBackend.mnn);
       expect(explicitMnnEntry.toJson()['backend'], 'mnn');
     });
+
+    test('parses and infers tier correctly', () {
+      final fastEntry = CatalogEntry.fromJson({
+        'id': 'fast-model',
+        'name': 'Fast Model',
+        'scale': 4,
+        'type': 'anime',
+        'tier': 'fast',
+        'inputSize': 128,
+        'fileSize': 1271540,
+        'sha256': 'abc',
+        'url': 'https://example.com/model.mnn',
+        'license': 'BSD-3-Clause',
+        'version': '1.0.0'
+      });
+      expect(fastEntry.tier, ModelTier.fast);
+      expect(fastEntry.toJson()['tier'], 'fast');
+
+      final inferredFast = CatalogEntry.fromJson({
+        'id': 'inferred-fast',
+        'name': 'Inferred Fast',
+        'scale': 4,
+        'type': 'anime',
+        'inputSize': 128,
+        'fileSize': 2000000,
+        'sha256': 'abc',
+        'url': 'https://example.com/model.mnn',
+        'license': 'BSD-3-Clause',
+        'version': '1.0.0'
+      });
+      expect(inferredFast.tier, ModelTier.fast);
+
+      final inferredQuality = CatalogEntry.fromJson({
+        'id': 'inferred-quality',
+        'name': 'Inferred Quality',
+        'scale': 4,
+        'type': 'general',
+        'inputSize': 128,
+        'fileSize': 17180132,
+        'sha256': 'abc',
+        'url': 'https://example.com/model.mnn',
+        'license': 'BSD-3-Clause',
+        'version': '1.0.0'
+      });
+      expect(inferredQuality.tier, ModelTier.quality);
+    });
   });
 }

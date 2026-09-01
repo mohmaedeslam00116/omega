@@ -50,6 +50,7 @@ OMEGA_EXPORT OmegaMNNContext* omega_mnn_create(
     MNN::ScheduleConfig config;
     config.type = static_cast<MNNForwardType>(forward_type); // 3 = Vulkan, 2 = OpenCL, 0 = CPU
     config.numThread = num_threads > 0 ? num_threads : 4;
+    config.mode = MNN_GPU_TUNING_WIDE;
 
     MNN::BackendConfig backendConfig;
     backendConfig.precision = static_cast<MNN::BackendConfig::PrecisionMode>(precision_mode); // 2 = Low (FP16), 1 = Normal
@@ -58,8 +59,9 @@ OMEGA_EXPORT OmegaMNNContext* omega_mnn_create(
 
     ctx->session = ctx->net->createSession(config);
     if (!ctx->session && forward_type != MNN_FORWARD_CPU) {
-        LOGI("[OmegaMNN-Native] GPU (Vulkan) session creation failed, falling back to CPU...");
+        LOGI("[OmegaMNN-Native] GPU (Vulkan) session creation failed, falling back to multi-threaded CPU...");
         config.type = MNN_FORWARD_CPU;
+        config.backendConfig = nullptr;
         ctx->session = ctx->net->createSession(config);
     }
 

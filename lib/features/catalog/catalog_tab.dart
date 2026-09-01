@@ -28,6 +28,39 @@ class _CatalogTabState extends State<CatalogTab> {
   final Map<String, double> _progress = {};
   final Set<String> _downloaded = {};
 
+  String _tierLabel(ModelTier tier) {
+    switch (tier) {
+      case ModelTier.fast:
+        return '⚡ Fast';
+      case ModelTier.balanced:
+        return '⚖️ Balanced';
+      case ModelTier.quality:
+        return '💎 Ultra Quality';
+    }
+  }
+
+  Color _tierBg(ModelTier tier) {
+    switch (tier) {
+      case ModelTier.fast:
+        return const Color(0xFFFEF3C7);
+      case ModelTier.balanced:
+        return const Color(0xFFE0E7FF);
+      case ModelTier.quality:
+        return const Color(0xFFF3E8FF);
+    }
+  }
+
+  Color _tierFg(ModelTier tier) {
+    switch (tier) {
+      case ModelTier.fast:
+        return const Color(0xFF92400E);
+      case ModelTier.balanced:
+        return const Color(0xFF3730A3);
+      case ModelTier.quality:
+        return const Color(0xFF6B21A8);
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -39,6 +72,7 @@ class _CatalogTabState extends State<CatalogTab> {
     "name": "General Photo 4×",
     "scale": 4,
     "type": "general",
+    "tier": "balanced",
     "inputSize": 128,
     "fileSize": 8389964,
     "sha256": "86d076d2acce51190d41cfdde3acdc431c2861dd747f5707cc65003a2e2c5814",
@@ -52,6 +86,7 @@ class _CatalogTabState extends State<CatalogTab> {
     "name": "Anime & Digital Art 4×",
     "scale": 4,
     "type": "anime",
+    "tier": "fast",
     "inputSize": 128,
     "fileSize": 1271540,
     "sha256": "74189d7c0b8e7aafcfef3038e5f76d7d73b28d19327e82f28cb43d179cc5be99",
@@ -61,11 +96,27 @@ class _CatalogTabState extends State<CatalogTab> {
     "bundled": true
   },
   {
+    "id": "realesr-anime-6b-int8",
+    "name": "Anime Pro 4× (6B INT8)",
+    "scale": 4,
+    "type": "anime",
+    "backend": "mnn",
+    "tier": "balanced",
+    "inputSize": 128,
+    "fileSize": 4518000,
+    "sha256": "3a5df67926ce40498b8ec66ac898863fba880a6b7e05e54612c6f112fa89b275",
+    "url": "https://github.com/mohmaedeslam00116/omega-models/releases/download/v1.0.0/RealESRGAN_x4plus_anime_6B_int8.mnn",
+    "license": "BSD-3-Clause",
+    "version": "1.0.0",
+    "bundled": false
+  },
+  {
     "id": "realesr-x4plus-int8",
     "name": "Ultra Quality 4× (RRDBNet INT8)",
     "scale": 4,
     "type": "general",
     "backend": "mnn",
+    "tier": "quality",
     "inputSize": 128,
     "fileSize": 17180132,
     "sha256": "4c9bd6946666a1ec62d622d60847166c31394d6d741d43d5f83eb3ef11e68ab8",
@@ -80,6 +131,7 @@ class _CatalogTabState extends State<CatalogTab> {
     "scale": 4,
     "type": "general",
     "backend": "mnn",
+    "tier": "quality",
     "inputSize": 128,
     "fileSize": 33660484,
     "sha256": "719a4e97ef9780599235f0b9a287f4f51c96e5e20d3a01d89bd093f4ab96731f",
@@ -284,6 +336,26 @@ class _CatalogTabState extends State<CatalogTab> {
                                                 style: theme.textTheme
                                                     .titleMedium),
                                           ),
+                                          const SizedBox(width: 6),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 6, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color: _tierBg(e.tier),
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
+                                            ),
+                                            child: Text(
+                                              _tierLabel(e.tier),
+                                              style: theme.textTheme.labelLarge
+                                                  ?.copyWith(
+                                                fontSize: 9,
+                                                fontWeight: FontWeight.w600,
+                                                color: _tierFg(e.tier),
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 6),
                                           Container(
                                             padding: const EdgeInsets.symmetric(
                                                 horizontal: 8, vertical: 4),

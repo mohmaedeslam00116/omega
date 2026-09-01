@@ -75,11 +75,11 @@ void main() {
     await tester.pumpAndSettle();
 
     final sw = tester.widget<SwitchListTile>(find.byType(SwitchListTile).first);
-    expect(sw.value, false);
+    expect(sw.value, true);
     await tester.tap(find.byType(SwitchListTile).first);
     await tester.pumpAndSettle();
-    expect(engine.useGpu, true);
-    expect(svc.useGpu, true);
+    expect(engine.useGpu, false);
+    expect(svc.useGpu, false);
   });
 
   testWidgets('Setting cache limit to 100MB persists', (tester) async {

@@ -7,15 +7,15 @@ void main() {
     SharedPreferences.setMockInitialValues({});
   });
 
-  test('GPU toggle persists', () async {
+  test('GPU toggle persists and defaults to true', () async {
     final prefs = await SharedPreferences.getInstance();
     final svc = SettingsService(prefs);
-    expect(svc.useGpu, false);
-    await svc.setUseGpu(true);
     expect(svc.useGpu, true);
+    await svc.setUseGpu(false);
+    expect(svc.useGpu, false);
     // New instance should read persisted
     final svc2 = SettingsService(await SharedPreferences.getInstance());
-    expect(svc2.useGpu, true);
+    expect(svc2.useGpu, false);
   });
 
   test('Cache limit persists', () async {

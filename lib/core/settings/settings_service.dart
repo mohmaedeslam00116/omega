@@ -16,7 +16,7 @@ class SettingsService {
     return SettingsService(prefs);
   }
 
-  bool get useGpu => prefs.getBool(_kUseGpu) ?? false;
+  bool get useGpu => prefs.getBool(_kUseGpu) ?? true;
   Future<void> setUseGpu(bool v) => prefs.setBool(_kUseGpu, v);
 
   int get cacheLimitBytes =>
