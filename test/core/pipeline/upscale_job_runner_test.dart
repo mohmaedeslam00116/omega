@@ -92,7 +92,7 @@ void main() {
       // Isolate — the runner must materialize them as files on the caller
       // side before spawning.
       final path = await resolveModelPathForWorker(
-          'assets/models/realesr-general-x4v3_fp16.tflite',
+          'assets/NOTICES',
           tempDirOverride: () async => Directory.systemTemp);
       expect(path, isNot(startsWith('assets/')));
       expect(File(path).existsSync(), true);

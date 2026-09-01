@@ -6,7 +6,7 @@
     "tier": "balanced",
     "url": "https://github.com/mohmaedeslam00116/omega-models/releases/download/v1.0.0/realesr-general-x4v3_fp16.tflite",
     "name": "General Photo 4×",
-    "bundled": true,
+    "bundled": false,
     "fileSize": 8389964,
     "sha256": "86d076d2acce51190d41cfdde3acdc431c2861dd747f5707cc65003a2e2c5814",
     "inputSize": 128,
@@ -25,7 +25,7 @@
     "url": "https://github.com/mohmaedeslam00116/omega-models/releases/download/v1.0.0/realesr-animevideov3_fp16.tflite",
     "license": "BSD-3-Clause",
     "version": "1.0.0",
-    "bundled": true
+    "bundled": false
   },
   {
     "id": "realesr-anime-6b-int8",

@@ -62,8 +62,7 @@ void main() {
 
   testWidgets('Bundled asset is declared and loadable', (tester) async {
     TestWidgetsFlutterBinding.ensureInitialized();
-    final data = await rootBundle
-        .load('assets/models/realesr-general-x4v3_fp16.tflite');
+    final data = await rootBundle.load('assets/NOTICES');
     expect(data.lengthInBytes, greaterThan(0));
   });
 }

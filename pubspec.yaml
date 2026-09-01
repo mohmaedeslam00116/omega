@@ -80,8 +80,6 @@ flutter:
   uses-material-design: true
 
   assets:
-    - assets/models/realesr-general-x4v3_fp16.tflite
-    - assets/models/realesr-animevideov3_fp16.tflite
     - assets/NOTICES
 
   # An image asset can refer to one or more resolution-specific "variants", see
