@@ -12,6 +12,7 @@ import '../../core/pipeline/upscale_job_runner.dart';
 import '../../core/pipeline/upscale_pipeline.dart';
 import '../../core/preset/human_friendly_preset.dart';
 import '../../core/settings/settings_service.dart';
+import 'widgets/comparison_slider.dart';
 
 class UpscaleTab extends StatefulWidget {
   final ImageIoService? imageIo;
@@ -51,6 +52,7 @@ class _UpscaleTabState extends State<UpscaleTab> {
   double _progress = 0;
   String? _error;
   double _slider = 0.5;
+  Duration? _lastDuration;
   CancelToken? _activeToken;
   SettingsService? _settings;
 
@@ -317,6 +319,7 @@ class _UpscaleTabState extends State<UpscaleTab> {
         useGpu: useGpu,
       );
 
+      final stopwatch = Stopwatch()..start();
       final out = await _runner.run(
         _inputBytes!,
         config: config,
@@ -327,10 +330,12 @@ class _UpscaleTabState extends State<UpscaleTab> {
         },
         cancelToken: token,
       );
+      stopwatch.stop();
 
       if (mounted && !token.isCancelled) {
         setState(() {
           _outputBytes = out;
+          _lastDuration = stopwatch.elapsed;
           _isProcessing = false;
           _progress = 1.0;
         });
@@ -466,60 +471,15 @@ class _UpscaleTabState extends State<UpscaleTab> {
 
   Widget _buildHeroCard(ThemeData theme) {
     if (_outputBytes != null && _inputBytes != null) {
-      // Comparison View
-      return Column(
-        children: [
-          Container(
-            height: 340,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(24),
-              color: theme.colorScheme.surfaceContainerHigh,
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: Stack(
-              children: [
-                Positioned.fill(
-                  child: Image.memory(_outputBytes!, fit: BoxFit.contain),
-                ),
-                Positioned.fill(
-                  child: ClipRect(
-                    clipper: _HorizontalSplitClipper(_slider),
-                    child: Image.memory(_inputBytes!, fit: BoxFit.contain),
-                  ),
-                ),
-                Positioned(
-                  left: 16,
-                  bottom: 16,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.black54,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Text('Before', style: TextStyle(color: Colors.white, fontSize: 12)),
-                  ),
-                ),
-                Positioned(
-                  right: 16,
-                  bottom: 16,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.black54,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Text('After (4×)', style: TextStyle(color: Colors.white, fontSize: 12)),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          Slider(
-            value: _slider,
-            onChanged: (v) => setState(() => _slider = v),
-          ),
-        ],
+      return ComparisonSlider(
+        beforeBytes: _inputBytes!,
+        afterBytes: _outputBytes!,
+        inputWidth: _inputWidth,
+        inputHeight: _inputHeight,
+        duration: _lastDuration,
+        onSave: () => _showSaveModal(context),
+        onShare: () => _imageIo.shareImage(_outputBytes!),
+        onNewImage: () => _setImageBytes(null),
       );
     }
 
@@ -730,24 +690,7 @@ class _UpscaleTabState extends State<UpscaleTab> {
 
   Widget _buildActionSection(ThemeData theme) {
     if (_outputBytes != null) {
-      // Save & Share Buttons
-      return Row(
-        children: [
-          Expanded(
-            child: FilledButton.icon(
-              onPressed: () => _showSaveModal(context),
-              icon: const Icon(Icons.save_alt_rounded),
-              label: const Text('Save to Gallery'),
-            ),
-          ),
-          const SizedBox(width: 12),
-          IconButton.filledTonal(
-            tooltip: 'Share',
-            onPressed: () => _imageIo.shareImage(_outputBytes!),
-            icon: const Icon(Icons.share_rounded),
-          ),
-        ],
-      );
+      return const SizedBox.shrink();
     }
 
     if (_isProcessing) {
@@ -878,16 +821,4 @@ class _UpscaleTabState extends State<UpscaleTab> {
       ),
     );
   }
-}
-
-class _HorizontalSplitClipper extends CustomClipper<Rect> {
-  final double split;
-  _HorizontalSplitClipper(this.split);
-
-  @override
-  Rect getClip(Size size) => Rect.fromLTWH(0, 0, size.width * split, size.height);
-
-  @override
-  bool shouldReclip(covariant _HorizontalSplitClipper oldClipper) =>
-      oldClipper.split != split;
 }
