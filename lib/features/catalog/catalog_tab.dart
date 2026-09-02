@@ -48,7 +48,7 @@ class _CatalogTabState extends State<CatalogTab> {
     "url": "https://github.com/mohmaedeslam00116/omega-models/releases/download/v1.0.0/realesr-general-x4v3_fp16.tflite",
     "license": "BSD-3-Clause",
     "version": "1.0.0",
-    "bundled": true
+    "bundled": false
   },
   {
     "id": "realesr-animevideov3",
@@ -62,7 +62,7 @@ class _CatalogTabState extends State<CatalogTab> {
     "url": "https://github.com/mohmaedeslam00116/omega-models/releases/download/v1.0.0/realesr-animevideov3_fp16.tflite",
     "license": "BSD-3-Clause",
     "version": "1.0.0",
-    "bundled": true
+    "bundled": false
   },
   {
     "id": "plainusr-x4-int8",
