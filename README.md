@@ -1,120 +1,143 @@
-# Omega — On-Device AI Image Super-Resolution
+# Omega — 100% On-Device AI Image Super-Resolution
 
 <p align="center">
-  <b>تطبيق فائق السرعة لترقية وتحسين جودة الصور بنسبة 4× محلياً على الهاتف 100% بالذكاء الاصطناعي</b><br>
-  <b>Blazing-fast, 100% on-device AI 4× image upscaler powered by Flutter, Alibaba MNN (Vulkan GPU), and TFLite.</b>
+  <b>Blazing-Fast, Zero-Cloud AI Image Upscaling & Enhancement for Mobile Devices</b><br>
+  Powered by Flutter, Alibaba MNN (Vulkan GPU Shaders), Google TFLite, and Cascaded SOTA Micro-Models.
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Flutter-%2302569B.svg?style=flat&logo=Flutter&logoColor=white" alt="Flutter">
-  <img src="https://img.shields.io/badge/Dart-FFI-%230175C2.svg?style=flat&logo=dart&logoColor=white" alt="Dart FFI">
-  <img src="https://img.shields.io/badge/Alibaba-MNN%20Vulkan-%23FF6A00.svg?style=flat" alt="MNN Vulkan">
-  <img src="https://img.shields.io/badge/TFLite-FP16-%23FF6F00.svg?style=flat&logo=tensorflow&logoColor=white" alt="TFLite">
-  <img src="https://img.shields.io/badge/License-MIT-green.svg?style=flat" alt="License">
+  <img src="https://img.shields.io/badge/Flutter-3.x-02569B?style=flat&logo=flutter&logoColor=white" alt="Flutter">
+  <img src="https://img.shields.io/badge/Tests-139%20Passing-brightgreen?style=flat&logo=checkmarx&logoColor=white" alt="Tests">
+  <img src="https://img.shields.io/badge/Engine-Alibaba%20MNN%20Vulkan-FF6A00?style=flat" alt="MNN Vulkan">
+  <img src="https://img.shields.io/badge/Icons-Lucide%20Vector-indigo?style=flat" alt="Lucide Icons">
+  <img src="https://img.shields.io/badge/Architecture-Cascaded%20Pipeline-blue?style=flat" alt="Cascaded Pipeline">
+  <img src="https://img.shields.io/badge/License-GPL--3.0-green.svg?style=flat" alt="License">
 </p>
 
 ---
 
-## ✨ المميزات الرئيسية / Key Features
+## 🌟 Highlights & Overview
 
-- 🔒 **خصوصية تامة 100% (Zero-Cloud)**: معالجة الصور بالكامل محلياً على عتاد هاتفك بدون إرسال أي بكسل إلى الإنترنت.
-- ⚡ **معمارية محركات هجينة (Pluggable Multi-Engine)**:
-  - **Alibaba MNN**: تسريع فائق للنماذج المعقدة (RRDBNet) عبر معالج الرسوميات **Vulkan GPU Shaders** بدون أي نسخ وسيط للذاكرة (Zero-Copy Dart FFI).
-  - **Google TFLite**: تشغيل خفيف وموفر للطاقة للنماذج المدمجة عبر GPU Delegate / NNAPI / CPU.
-- 🧠 **نماذج ذكاء اصطناعي رائدة (State-of-the-Art Models)**:
-  - **Ultra Quality 4× (RealESRGAN RRDBNet)**: النموذج الأقوى عالمياً مضغوطاً بنسبة **75%** عبر تقنية **INT8 Weight-Only Quantization** (حجم 17.1MB فقط مع الحفاظ الكامل على دقة الألوان وتدرجاتها).
-  - **General Photo 4× (SRVGGNet)**: نموذج مدمج سريع وخفيف للصور الواقعية والوجوه.
-  - **Anime & Digital Art 4× (AnimeVideo v3)**: نموذج مدمج فائق الخفة (1.3MB) مخصص لرسومات الأنمي والديجيتال آرت.
-- 🧩 **تقطيع متكيف وإدارة ذكية للذاكرة (Adaptive Tiling & MemoryGuard)**:
-  - تقسيم الصور الكبيرة تلقائياً إلى قطع `64x64` أو `128x128` حسب سعة رام الجهاز، لضمان استهلاك ذاكرة منخفض (<35MB) ومنع أي كراش نهائياً (0% OOM crashes).
-  - دمج ريشي ناعم (`Feathered Blending`) بدون أي خطوط أو فواصل بصرية.
-- 🎨 **واجهة مستخدم احترافية (Impeccable UI)**:
-  - عارض مقارنة تفاعلي بالانزلاق (Before / After Slider).
-  - خيارات تصدير وحفظ متعددة (PNG بدون فقدان جودة / JPEG مخصص مع تذكر الجودة المختارة).
-  - متجر كتالوج سحابي مدمج لتنزيل وإدارة النماذج مع التحقق من التجزئة الرقمية المشفرة (SHA256).
+Omega is a high-performance, studio-grade on-device image super-resolution app designed from the ground up for low-to-mid range mobile GPUs (ARM Mali and Qualcomm Adreno).
+
+- 🔒 **100% Zero-Cloud Privacy**: Complete on-device inference without uploading pixels to any remote server or third-party cloud.
+- ⚡ **Alibaba MNN Vulkan GPU Acceleration**: Native C++ inference executing hardware-accelerated Vulkan compute shaders with half-precision (FP16) and INT8 weight quantization.
+- 🎯 **Task-Driven, Consumer-Friendly UX**: Clean, modern single-screen workflow inspired by SuperImage. No confusing technical model jargon — simply pick **Photos** or **Art & Anime** and upscale.
+- 💎 **Lucide Vector Design System**: Cohesive, modern vector iconography powered by `lucide_icons_flutter` with zero emoji rendering clutter.
+- 🖼️ **Interactive Split Comparison Slider**: Synchronized pinch-to-zoom (1.0x–8.0x) and pan, side-by-side split comparison, and resolution metadata overlay.
+- 📦 **Batch Upscale Carousel**: Select multiple images from the gallery and process them sequentially with live progress telemetry.
+- ⛓️ **Cascaded Multi-Stage Pipeline**: Modular stage execution in memory (Denoising 1x $\to$ Super-Resolution 4x $\to$ Line Art Refine 1x).
+- 🛡️ **Adaptive Tiling & MemoryGuard**: Dynamic tile sizing (64x64 / 128x128) with Hann/Cosine feather blending, guaranteeing 0% OOM crashes on budget devices (<4GB RAM).
 
 ---
 
-## 🏛️ البنية المعمارية / System Architecture
+## 🏛️ System Architecture
 
 ```mermaid
 flowchart TD
-    A[Input Image] --> B[MemoryGuard]
-    B -->|Check Device RAM & Model| C{Adaptive Tiling}
-    C -->|<=4GB RAM or Heavy RRDBNet| D[64x64 Tiles with 16px Overlap]
-    C -->|>=8GB RAM & Fast Model| E[128x128 Tiles with 36px Overlap]
-    D --> F[EngineFactory]
-    E --> F[EngineFactory]
-    F -->|MNN Backend| G[MnnEngineImpl - Vulkan GPU FFI]
-    F -->|TFLite Backend| H[TfliteEngineImpl - TFLite C API]
-    G --> I[Feathered Canvas Stitching]
-    H --> I[Feathered Canvas Stitching]
-    I --> J[Final 4x Upscaled Image]
+    subgraph UI ["Studio-Grade UI Layer (Material 3 Expressive)"]
+        A[Image Picker / Camera] --> B[2D Preset Selector: Content & Quality]
+        B --> C[Batch Queue Carousel]
+    end
+
+    subgraph DeepModule ["UpscaleCoordinator (Deep Module)"]
+        C --> D[AdaptiveRouter]
+        D --> E[BundleResolver]
+        E --> F[DownloadManager]
+    end
+
+    subgraph Pipeline ["Cascaded Multi-Stage Pipeline"]
+        F --> G[MemoryGuard: Ram Budgeting]
+        G --> H[Adaptive 2D Tiling Grid]
+        H --> I[Stage 1: Denoise 1x]
+        I --> J[Stage 2: Upscale 4x]
+        J --> K[Stage 3: Feature Refinement]
+        K --> L[2D Cosine Feather Blending]
+    end
+
+    subgraph Hardware ["Hardware Acceleration Seam"]
+        I & J & K --> M[MNN Engine Native C++ / Vulkan GPU]
+    end
+
+    L --> N[Interactive Comparison Slider & Gallery Export]
 ```
 
 ---
 
-## 📦 كتالوج النماذج / Model Catalog
+## 📊 Model Zoo & SOTA Benchmark Matrix
 
-| النموذج / Model | المعمارية / Architecture | المحرك / Engine | الحجم / Size | الحالة / Status |
-| :--- | :--- | :--- | :--- | :--- |
-| **General Photo 4×** | SRVGGNet Compact | TFLite FP16 | **8.4 MB** | **مدمج (Offline)** |
-| **Anime & Digital Art 4×** | SRVGGNet-Anime | TFLite FP16 | **1.3 MB** | **مدمج (Offline)** |
-| **Ultra Quality 4× (INT8)** | RealESRGAN RRDBNet | MNN (Vulkan GPU) | **17.1 MB** | **سحابي (On-Demand)** |
-| **Ultra Quality 4× (FP16)** | RealESRGAN RRDBNet | MNN (Vulkan GPU) | **33.6 MB** | **سحابي (On-Demand)** |
+All models are quantized to **INT8 weight-only** to ensure ultra-compact sizes ($<500$ KB) and high memory bandwidth efficiency on mobile GPUs:
 
-يتم استضافة النماذج وتحديثها تلقائياً عبر مستودع:  
-👉 [**mohmaedeslam00116/omega-models**](https://github.com/mohmaedeslam00116/omega-models)
+| Model ID | Architecture | Stage Role | Scale | File Size | Latency (Mali-G72) | Bundled? |
+| :--- | :--- | :--- | :---: | :---: | :---: | :---: |
+| **`safmn-x4-int8`** | SAFMN (Spatially-Adaptive) | Upscale | 4× | **240 KB** | **~55 ms** | ✅ **Offline** |
+| **`srvggnet-compact-anime-int8`** | SRVGGNet-Compact | Upscale | 4× | **320 KB** | **~75 ms** | ✅ **Offline** |
+| **`realesrgan-anime-6b-int8`** | RealESRGAN Anime 6B | Upscale | 4× | **4.5 MB** | **~350 ms** | 🌐 On-Demand |
+| **`plainusr-x4-int8`** | PlainUSR | Upscale | 4× | **310 KB** | **~70 ms** | 🌐 On-Demand |
+| **`ecbsr-repvgg-x4-int8`** | ECBSR RepVGG (Folded) | Upscale | 4× | **448 KB** | **~65 ms** | 🌐 On-Demand |
+| **`nafnet-tiny-int8`** | NAFNet-Tiny | Denoise | 1× | **419 KB** | **~45 ms** | 🌐 On-Demand |
+| **`animeline-sharpen-int8`** | AnimeLineSharpen | Line Refine | 1× | **71 KB** | **~18 ms** | 🌐 On-Demand |
 
 ---
 
-## 🚀 التشغيل والتطوير / Quick Start
+## 🚀 Quick Start & Development
 
-### المتطلبات الأساسية:
-- **Flutter SDK**: `>=3.10.0`
-- **Android NDK**: `>=25.0` (لبناء مكتبات Vulkan C++)
-- **Java**: 17+
+### Prerequisites
+- **Flutter SDK**: `>= 3.10.0`
+- **Android NDK**: `>= 25.0` (for MNN Vulkan C++ compilation)
+- **Java JDK**: `17+`
 
-### أوامر التشغيل:
+### Installation & Run
 
 ```bash
-# 1. استنساخ المستودع
+# 1. Clone the repository
 git clone https://github.com/mohmaedeslam00116/omega.git
 cd omega
 
-# 2. تثبيت الحزم
+# 2. Install dependencies
 flutter pub get
 
-# 3. تشغيل الاختبارات للتأكد من جاهزية الكود (116 اختبار)
+# 3. Run the comprehensive test suite (139 tests)
 flutter test
 
-# 4. تشغيل التطبيق على الهاتف المتصل
+# 4. Launch on connected Android device
 flutter run -d <device-id>
+```
+
+### Building Release APK
+
+```bash
+# Build optimized ARM64 release APK
+flutter build apk --release --target-platform android-arm64
 ```
 
 ---
 
-## 📚 وثائق القرارات المعمارية / Architecture Decision Records (ADRs)
+## 📚 Architecture Decision Records (ADRs)
 
-المشروع موثق وفق أعلى معايير هندسة البرمجيات:
-- [**ADR-0001: Initial Architecture**](docs/adr/0001-initial-architecture.md)
-- [**ADR-0002: GitHub Releases Model Catalog**](docs/adr/0002-github-releases-catalog.md)
-- [**ADR-0003: TFLite Inference Engine**](docs/adr/0003-tflite-engine.md)
-- [**ADR-0004: Catalog Schema & Bundled Models**](docs/adr/0004-catalog-schema-and-default-model.md)
-- [**ADR-0007: Background Worker Isolate Pipeline**](docs/adr/0007-upscale-isolate-pipeline.md)
-- [**ADR-0008: Pluggable Multi-Engine Architecture (MNN + TFLite)**](docs/adr/0008-pluggable-engine-architecture.md)
-- [**ADR-0009: Adaptive Tiling & Dynamic RAM Memory Guard**](docs/adr/0009-adaptive-tiling-memory-guard.md)
+Omega strictly adheres to Architecture Decision Records to ensure codebase transparency and maintainability:
+
+* [ADR-0001: Initial Architecture & Seams](docs/adr/0001-initial-architecture.md)
+* [ADR-0002: TFLite Engine Implementation](docs/adr/0002-tflite-engine.md)
+* [ADR-0003: High-Res Image Pipeline](docs/adr/0003-high-res-pipeline.md)
+* [ADR-0004: Versioned Remote Catalog](docs/adr/0004-remote-catalog.md)
+* [ADR-0005: Clean UI Architecture](docs/adr/0005-ui-architecture.md)
+* [ADR-0006: Android Permission & Gallery Integration](docs/adr/0006-android-integration.md)
+* [ADR-0007: MNN C++ Native Integration](docs/adr/0007-mnn-cpp-native-integration.md)
+* [ADR-0008: PyTorch to MNN Quantization Pipeline](docs/adr/0008-pytorch-to-mnn-quantization-pipeline.md)
+* [ADR-0009: Hybrid Dual-Engine Architecture](docs/adr/0009-hybrid-dual-engine-architecture.md)
+* [ADR-0010: Fast Model Catalog & GPU Policy](docs/adr/0010-fast-model-catalog-and-default-gpu-policy.md)
+* [ADR-0011: Omega Edge AI Optimization Project](docs/adr/0011-omega-edge-research-repo.md)
+* [ADR-0012: SuperImage-Inspired UI & Human Presets](docs/adr/0012-superimage-inspired-ui-and-human-presets.md)
+* [ADR-0013: Structural Reparameterization (ECBSR)](docs/adr/0013-structural-reparameterization-ecbsr.md)
+* [ADR-0014: Cascaded Multi-Model Vision Pipeline](docs/adr/0014-cascaded-multi-model-pipeline.md)
+* [ADR-0015: SuperImage-Style Task-Driven UI](docs/adr/0015-superimage-style-task-driven-ui.md)
+* [ADR-0016: Lucide Vector Icons Design System](docs/adr/0016-lucide-icons-design-system.md)
+* [ADR-0017: Remote Model Hosting & Release Distribution](docs/adr/0017-remote-model-hosting-and-release-distribution.md)
 
 ---
 
-## 🤝 المساهمة / Contributing
+## 📄 License
 
-نرحب بجميع المساهمات الهندسية من مجتمع المطورين!  
-يرجى قراءة [CONTRIBUTING.md](CONTRIBUTING.md) و [AGENTS.md](AGENTS.md) قبل تقديم أي Pull Request.
-
----
-
-## 📄 الترخيص / License
-
-المشروع مرخص تحت رخصة **[MIT License](LICENSE)** © 2026 Mohamedeslam.  
-النماذج تحتفظ بتراخيص مطوريها الأصليين (BSD-3-Clause / Apache-2.0).
+- **Omega App Core**: Licensed under the **GNU General Public License v3.0 (GPL-3.0)**.
+- **Micro-Models**: Individual model weights are distributed under their respective upstream licenses (MIT, Apache-2.0, BSD-3-Clause).

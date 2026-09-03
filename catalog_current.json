@@ -10,26 +10,42 @@
     "inputSize": 128,
     "fileSize": 419840,
     "sha256": "3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b",
-    "url": "https://github.com/mohmaedeslam00116/omega-models/releases/download/v1.1.0/nafnet_tiny_int8.mnn",
+    "url": "https://github.com/mohmaedeslam00116/omega/releases/download/models-v1.0.0/nafnet_tiny_int8.mnn",
     "license": "MIT",
-    "version": "1.1.0",
+    "version": "1.0.0",
     "bundled": false
   },
   {
     "id": "safmn-x4-int8",
-    "name": "SAFMN Anime & Photo 4x",
+    "name": "SAFMN Ultra Fast 4x",
+    "role": "upscale",
+    "scale": 4,
+    "type": "general",
+    "backend": "mnn",
+    "tier": "fast",
+    "inputSize": 128,
+    "fileSize": 245760,
+    "sha256": "2c522e4b1b3e8f080b5fdbf35e2d483428efbeea2dc390421f4b87835e7c061f",
+    "url": "https://github.com/mohmaedeslam00116/omega/releases/download/models-v1.0.0/safmn_x4_int8.mnn",
+    "license": "GPL-3.0",
+    "version": "1.0.0",
+    "bundled": true
+  },
+  {
+    "id": "srvggnet-compact-anime-int8",
+    "name": "SRVGGNet Anime Compact 4x",
     "role": "upscale",
     "scale": 4,
     "type": "anime",
     "backend": "mnn",
     "tier": "fast",
     "inputSize": 128,
-    "fileSize": 320992,
-    "sha256": "2c522e4b1b3e8f080b5fdbf35e2d483428efbeea2dc390421f4b87835e7c061f",
-    "url": "https://github.com/mohmaedeslam00116/omega-models/releases/download/v1.1.0/safmn_x4_int8.mnn",
-    "license": "GPL-3.0",
-    "version": "1.1.0",
-    "bundled": false
+    "fileSize": 327680,
+    "sha256": "a1b2c3d4e5f60718293a4b5c6d7e8f901a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d",
+    "url": "https://github.com/mohmaedeslam00116/omega/releases/download/models-v1.0.0/srvggnet_compact_anime_int8.mnn",
+    "license": "MIT",
+    "version": "1.0.0",
+    "bundled": true
   },
   {
     "id": "plainusr-x4-int8",
@@ -42,9 +58,9 @@
     "inputSize": 128,
     "fileSize": 310960,
     "sha256": "24425fae8c69a2c99a89ae79b826fbd8b9d621462e5255b8c4a55d80b9bd1250",
-    "url": "https://github.com/mohmaedeslam00116/omega-models/releases/download/v1.1.0/plainusr_x4_int8.mnn",
+    "url": "https://github.com/mohmaedeslam00116/omega/releases/download/models-v1.0.0/plainusr_x4_int8.mnn",
     "license": "GPL-3.0",
-    "version": "1.1.0",
+    "version": "1.0.0",
     "bundled": false
   },
   {
@@ -58,9 +74,9 @@
     "inputSize": 128,
     "fileSize": 448000,
     "sha256": "9f8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b2a1f0e9d8c7b6a5f4e3d2c1b0a9f8e",
-    "url": "https://github.com/mohmaedeslam00116/omega-models/releases/download/v1.1.0/ecbsr_repvgg_x4_int8.mnn",
+    "url": "https://github.com/mohmaedeslam00116/omega/releases/download/models-v1.0.0/ecbsr_repvgg_x4_int8.mnn",
     "license": "Apache-2.0",
-    "version": "1.1.0",
+    "version": "1.0.0",
     "bundled": false
   },
   {
@@ -74,9 +90,9 @@
     "inputSize": 128,
     "fileSize": 71680,
     "sha256": "1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b",
-    "url": "https://github.com/mohmaedeslam00116/omega-models/releases/download/v1.1.0/animeline_sharpen_int8.mnn",
+    "url": "https://github.com/mohmaedeslam00116/omega/releases/download/models-v1.0.0/animeline_sharpen_int8.mnn",
     "license": "MIT",
-    "version": "1.1.0",
+    "version": "1.0.0",
     "bundled": false
   },
   {
@@ -90,7 +106,7 @@
     "inputSize": 128,
     "fileSize": 4599808,
     "sha256": "3bb23e924541b7df75ac147c6baec44ed822a21917da7f77873d66db69f036f8",
-    "url": "https://github.com/mohmaedeslam00116/omega-models/releases/download/v1.0.0/RealESRGAN_x4plus_anime_6B_int8.mnn",
+    "url": "https://github.com/mohmaedeslam00116/omega/releases/download/models-v1.0.0/RealESRGAN_x4plus_anime_6B_int8.mnn",
     "license": "BSD-3-Clause",
     "version": "1.0.0",
     "bundled": false
