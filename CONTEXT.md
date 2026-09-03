@@ -65,8 +65,12 @@ The specific functional role of a micro-model within a pipeline (`denoise`, `ups
 _Avoid_: model purpose, stage type
 
 ### ModelBundle
-A logical grouping of atomic micro-models required to execute an end-to-end task pipeline (e.g. Anime Bundle, Photo Bundle).
-_Avoid_: model pack, zip archive
+A logical grouping of atomic micro-models required to execute an end-to-end task pipeline (e.g. Anime Bundle, Photo Bundle), downloaded transparently on demand without exposing technical model names to the user.
+_Avoid_: model pack, zip archive, model list
+
+### TaskDrivenUI
+A minimalist, consumer-friendly user interface pattern inspired by SuperImage that eliminates technical catalog browsing, organizing the user experience entirely around task modes (Anime vs Photo) with automated background bundle resolution.
+_Avoid_: model store UI, catalog tab, developer mode
 
 ### BundleResolver
 A service that verifies whether all atomic models in a required ModelBundle exist locally on disk, and calculates the exact list of missing models to download.

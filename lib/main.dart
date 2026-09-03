@@ -72,7 +72,7 @@ class _OmegaAppState extends State<OmegaApp> {
   }
 }
 
-class RootShell extends StatefulWidget {
+class RootShell extends StatelessWidget {
   final SettingsService? settingsService;
   final CatalogService? catalogService;
   final DownloadManager? downloadManager;
@@ -87,60 +87,38 @@ class RootShell extends StatefulWidget {
   });
 
   @override
-  State<RootShell> createState() => _RootShellState();
-}
-
-class _RootShellState extends State<RootShell> {
-  int _index = 0;
-
-  @override
   Widget build(BuildContext context) {
-    final Widget currentTab;
-    switch (_index) {
-      case 0:
-        currentTab = UpscaleTab(
-          settingsService: widget.settingsService,
-          downloadManager: widget.downloadManager,
-        );
-        break;
-      case 1:
-        currentTab = CatalogTab(
-          catalogService: widget.catalogService,
-          downloadManager: widget.downloadManager,
-        );
-        break;
-      case 2:
-      default:
-        currentTab = SettingsTab(
-          settingsService: widget.settingsService,
-          downloadManager: widget.downloadManager,
-          onThemeChanged: widget.onThemeChanged,
-        );
-        break;
-    }
-
     return Scaffold(
-      body: currentTab,
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _index,
-        onDestinationSelected: (i) => setState(() => _index = i),
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.auto_awesome_outlined),
-            selectedIcon: Icon(Icons.auto_awesome),
-            label: 'Upscale',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.layers_outlined),
-            selectedIcon: Icon(Icons.layers),
-            label: 'Models',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.settings_outlined),
-            selectedIcon: Icon(Icons.settings),
-            label: 'Settings',
+      appBar: AppBar(
+        title: const Text(
+          'Omega',
+          style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: -0.5),
+        ),
+        centerTitle: false,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings_outlined),
+            tooltip: 'Settings',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (ctx) => Scaffold(
+                    appBar: AppBar(title: const Text('Settings')),
+                    body: SettingsTab(
+                      settingsService: settingsService,
+                      downloadManager: downloadManager,
+                      onThemeChanged: onThemeChanged,
+                    ),
+                  ),
+                ),
+              );
+            },
           ),
         ],
+      ),
+      body: UpscaleTab(
+        settingsService: settingsService,
+        downloadManager: downloadManager,
       ),
     );
   }

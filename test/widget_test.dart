@@ -10,20 +10,20 @@ void main() {
     SharedPreferences.setMockInitialValues({});
   });
 
-  testWidgets('RootShell shows three tabs with Material 3 navigation', (
+  testWidgets('RootShell shows SuperImage-style single screen with Settings action', (
     tester,
   ) async {
     final catalogService = CatalogServiceStub('''[
       {
-        "id": "realesr-general-x4v3",
-        "name": "General Photo 4×",
+        "id": "safmn-x4-int8",
+        "name": "SAFMN 4x",
         "scale": 4,
-        "type": "general",
+        "type": "anime",
         "inputSize": 128,
         "fileSize": 10,
         "sha256": "abc",
-        "url": "https://example.com/a.tflite",
-        "license": "BSD-3-Clause",
+        "url": "https://example.com/a.mnn",
+        "license": "GPL-3.0",
         "version": "1.0.0",
         "bundled": true
       }
@@ -33,30 +33,18 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 
-    expect(find.text('Upscale'), findsWidgets);
-    expect(find.text('Models'), findsWidgets);
-    expect(find.text('Settings'), findsWidgets);
-    expect(find.byType(NavigationBar), findsOneWidget);
+    expect(find.text('Omega'), findsOneWidget);
+    expect(find.byIcon(Icons.settings_outlined), findsOneWidget);
 
-    // Tap Models tab (Destination index 1)
-    await tester.tap(find.byType(NavigationDestination).at(1));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 50));
-    await tester.pump();
-    expect(find.text('General Photo 4×'), findsWidgets);
-
-    // Tap Settings tab (Destination index 2)
-    await tester.tap(find.byType(NavigationDestination).at(2));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 50));
-    await tester.pump();
+    // Tap Settings icon in AppBar
+    await tester.tap(find.byIcon(Icons.settings_outlined));
+    await tester.pumpAndSettle();
     expect(find.text('Appearance'), findsOneWidget);
     expect(find.text('Theme Mode'), findsOneWidget);
 
-    // Back to Upscale (Destination index 0)
-    await tester.tap(find.byType(NavigationDestination).at(0));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 50));
+    // Pop back to Upscale
+    await tester.pageBack();
+    await tester.pumpAndSettle();
     expect(find.text('No image selected'), findsOneWidget);
   });
 
