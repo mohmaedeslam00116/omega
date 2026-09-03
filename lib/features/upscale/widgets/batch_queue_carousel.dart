@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../models/batch_item.dart';
 
 class BatchQueueCarousel extends StatelessWidget {
@@ -50,7 +51,7 @@ class BatchQueueCarousel extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(
-                        Icons.add_photo_alternate_outlined,
+                        LucideIcons.imagePlus,
                         size: 22,
                         color: theme.colorScheme.primary,
                       ),
@@ -125,7 +126,7 @@ class BatchQueueCarousel extends StatelessWidget {
                               shape: BoxShape.circle,
                             ),
                             child: const Icon(
-                              Icons.close,
+                              LucideIcons.x,
                               size: 12,
                               color: Colors.white,
                             ),
@@ -151,7 +152,7 @@ class BatchQueueCarousel extends StatelessWidget {
             color: Colors.green,
             shape: BoxShape.circle,
           ),
-          child: const Icon(Icons.check_circle, size: 14, color: Colors.white),
+          child: const Icon(LucideIcons.check, size: 12, color: Colors.white),
         );
       case BatchItemStatus.processing:
         return Container(
@@ -176,7 +177,7 @@ class BatchQueueCarousel extends StatelessWidget {
             color: Colors.red,
             shape: BoxShape.circle,
           ),
-          child: const Icon(Icons.error, size: 14, color: Colors.white),
+          child: const Icon(LucideIcons.alertCircle, size: 12, color: Colors.white),
         );
       case BatchItemStatus.pending:
         return Container(
@@ -186,7 +187,7 @@ class BatchQueueCarousel extends StatelessWidget {
             shape: BoxShape.circle,
           ),
           child: const Icon(
-            Icons.hourglass_empty_rounded,
+            LucideIcons.clock,
             size: 12,
             color: Colors.white,
           ),

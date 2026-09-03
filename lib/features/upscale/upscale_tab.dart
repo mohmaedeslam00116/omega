@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:image/image.dart' as img;
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../core/catalog/catalog_entry.dart';
 import '../../core/download/download_manager.dart';
@@ -506,7 +507,7 @@ class _UpscaleTabState extends State<UpscaleTab> {
                   onPressed: _isProcessing
                       ? null
                       : () => setState(() => _batchItems.clear()),
-                  icon: const Icon(Icons.refresh_rounded),
+                  icon: const Icon(LucideIcons.rotateCcw, size: 20),
                 ),
             ],
           ),
@@ -546,7 +547,7 @@ class _UpscaleTabState extends State<UpscaleTab> {
               ),
               child: Row(
                 children: [
-                  Icon(Icons.error_outline, color: theme.colorScheme.onErrorContainer),
+                  Icon(LucideIcons.alertCircle, color: theme.colorScheme.onErrorContainer, size: 20),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
@@ -632,7 +633,7 @@ class _UpscaleTabState extends State<UpscaleTab> {
                 shape: BoxShape.circle,
               ),
               child: Icon(
-                Icons.add_photo_alternate_rounded,
+                LucideIcons.imagePlus,
                 size: 36,
                 color: theme.colorScheme.onPrimaryContainer,
               ),
@@ -656,13 +657,13 @@ class _UpscaleTabState extends State<UpscaleTab> {
               children: [
                 FilledButton.icon(
                   onPressed: _isProcessing ? null : _pickImage,
-                  icon: const Icon(Icons.photo_library_rounded, size: 18),
+                  icon: const Icon(LucideIcons.image, size: 18),
                   label: const Text('Gallery'),
                 ),
                 const SizedBox(width: 12),
                 OutlinedButton.icon(
                   onPressed: _isProcessing ? null : _pickCamera,
-                  icon: const Icon(Icons.camera_alt_rounded, size: 18),
+                  icon: const Icon(LucideIcons.camera, size: 18),
                   label: const Text('Camera'),
                 ),
               ],
@@ -688,7 +689,7 @@ class _UpscaleTabState extends State<UpscaleTab> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.aspect_ratio, size: 16, color: Colors.white),
+          const Icon(LucideIcons.scaling, size: 16, color: Colors.white),
           const SizedBox(width: 8),
           Text(
             '${item.inputWidth} × ${item.inputHeight}',
@@ -696,7 +697,7 @@ class _UpscaleTabState extends State<UpscaleTab> {
           ),
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 6),
-            child: Icon(Icons.arrow_forward, size: 14, color: Colors.white70),
+            child: Icon(LucideIcons.arrowRight, size: 14, color: Colors.white70),
           ),
           Text(
             '$outW × $outH (4×)',
@@ -764,18 +765,21 @@ class _UpscaleTabState extends State<UpscaleTab> {
         ),
         const SizedBox(height: 8),
         SegmentedButton<PresetQualityTier>(
-          segments: const [
+          segments: [
             ButtonSegment(
               value: PresetQualityTier.lightning,
-              label: Text('⚡ Lightning'),
+              label: const Text('Lightning'),
+              icon: Icon(PresetQualityTier.lightning.icon, size: 16),
             ),
             ButtonSegment(
               value: PresetQualityTier.balanced,
-              label: Text('⚖️ Balanced'),
+              label: const Text('Balanced'),
+              icon: Icon(PresetQualityTier.balanced.icon, size: 16),
             ),
             ButtonSegment(
               value: PresetQualityTier.ultraQuality,
-              label: Text('💎 Ultra'),
+              label: const Text('Ultra'),
+              icon: Icon(PresetQualityTier.ultraQuality.icon, size: 16),
             ),
           ],
           selected: {_qualityTier},
@@ -845,7 +849,7 @@ class _UpscaleTabState extends State<UpscaleTab> {
       height: 52,
       child: FilledButton.icon(
         onPressed: _batchItems.isEmpty ? null : _upscale,
-        icon: const Icon(Icons.auto_awesome_rounded),
+        icon: const Icon(LucideIcons.sparkles, size: 18),
         label: Text(
           btnLabel,
           style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),

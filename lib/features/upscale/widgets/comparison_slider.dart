@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 class ComparisonSlider extends StatefulWidget {
   final Uint8List beforeBytes;
@@ -80,7 +81,7 @@ class _ComparisonSliderState extends State<ComparisonSlider> {
           ),
           child: Row(
             children: [
-              Icon(Icons.auto_awesome, size: 16, color: theme.colorScheme.primary),
+              Icon(LucideIcons.sparkles, size: 16, color: theme.colorScheme.primary),
               const SizedBox(width: 8),
               if (inW != null && inH != null) ...[
                 Text(
@@ -89,7 +90,7 @@ class _ComparisonSliderState extends State<ComparisonSlider> {
                 ),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 6),
-                  child: Icon(Icons.arrow_forward, size: 14, color: theme.colorScheme.onSurfaceVariant),
+                  child: Icon(LucideIcons.arrowRight, size: 14, color: theme.colorScheme.onSurfaceVariant),
                 ),
                 Text(
                   '$outW × $outH (4×)',
@@ -112,7 +113,7 @@ class _ComparisonSliderState extends State<ComparisonSlider> {
                   tooltip: 'Reset Zoom',
                   visualDensity: VisualDensity.compact,
                   onPressed: _resetZoom,
-                  icon: const Icon(Icons.zoom_out_map, size: 18),
+                  icon: Icon(LucideIcons.zoomOut, size: 18, color: theme.colorScheme.primary),
                 ),
             ],
           ),
@@ -224,7 +225,7 @@ class _ComparisonSliderState extends State<ComparisonSlider> {
               flex: 3,
               child: FilledButton.icon(
                 onPressed: widget.onSave,
-                icon: const Icon(Icons.save_alt_rounded),
+                icon: const Icon(LucideIcons.download, size: 18),
                 label: const Text('Save to Gallery'),
               ),
             ),
@@ -232,14 +233,14 @@ class _ComparisonSliderState extends State<ComparisonSlider> {
             IconButton.filledTonal(
               tooltip: 'Share image',
               onPressed: widget.onShare,
-              icon: const Icon(Icons.share_rounded),
+              icon: const Icon(LucideIcons.share2, size: 18),
             ),
             const SizedBox(width: 8),
             Expanded(
               flex: 2,
               child: OutlinedButton.icon(
                 onPressed: widget.onNewImage,
-                icon: const Icon(Icons.add_photo_alternate_rounded, size: 18),
+                icon: const Icon(LucideIcons.imagePlus, size: 18),
                 label: const Text('New Image'),
               ),
             ),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../core/download/download_manager.dart';
 import '../../core/engine/tflite_engine.dart';
@@ -77,7 +78,7 @@ class _SettingsTabState extends State<SettingsTab> {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(v ? '⚡ GPU acceleration enabled' : 'CPU fallback enabled'),
+          content: Text(v ? 'GPU acceleration enabled' : 'CPU fallback enabled'),
           duration: const Duration(seconds: 2),
         ),
       );
@@ -201,7 +202,7 @@ class _SettingsTabState extends State<SettingsTab> {
           const SizedBox(height: 16),
 
           // 1. Appearance Section
-          _buildSectionHeader(context, 'Appearance', Icons.palette_outlined),
+          _buildSectionHeader(context, 'Appearance', LucideIcons.palette),
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -215,9 +216,9 @@ class _SettingsTabState extends State<SettingsTab> {
                   const SizedBox(height: 12),
                   SegmentedButton<String>(
                     segments: const [
-                      ButtonSegment(value: 'system', label: Text('System'), icon: Icon(Icons.brightness_auto)),
-                      ButtonSegment(value: 'light', label: Text('Light'), icon: Icon(Icons.light_mode)),
-                      ButtonSegment(value: 'dark', label: Text('Dark'), icon: Icon(Icons.dark_mode)),
+                      ButtonSegment(value: 'system', label: Text('System'), icon: Icon(LucideIcons.laptop, size: 16)),
+                      ButtonSegment(value: 'light', label: Text('Light'), icon: Icon(LucideIcons.sun, size: 16)),
+                      ButtonSegment(value: 'dark', label: Text('Dark'), icon: Icon(LucideIcons.moon, size: 16)),
                     ],
                     selected: {_themeMode},
                     onSelectionChanged: (set) => _setTheme(set.first),
@@ -229,7 +230,7 @@ class _SettingsTabState extends State<SettingsTab> {
           const SizedBox(height: 16),
 
           // 2. Export & Storage Section
-          _buildSectionHeader(context, 'Export & Quality', Icons.save_alt_outlined),
+          _buildSectionHeader(context, 'Export & Quality', LucideIcons.download),
           Card(
             child: Column(
               children: [
@@ -286,7 +287,7 @@ class _SettingsTabState extends State<SettingsTab> {
           const SizedBox(height: 16),
 
           // 3. Hardware & Performance Section
-          _buildSectionHeader(context, 'Engine & Performance', Icons.speed_outlined),
+          _buildSectionHeader(context, 'Engine & Performance', LucideIcons.cpu),
           Card(
             child: Column(
               children: [
@@ -302,7 +303,7 @@ class _SettingsTabState extends State<SettingsTab> {
                   color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
                   child: Row(
                     children: [
-                      Icon(Icons.memory, color: colorScheme.primary, size: 28),
+                      Icon(LucideIcons.zap, color: colorScheme.primary, size: 28),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Column(
@@ -329,7 +330,7 @@ class _SettingsTabState extends State<SettingsTab> {
           const SizedBox(height: 16),
 
           // 4. Cache & Maintenance Section
-          _buildSectionHeader(context, 'Storage & Maintenance', Icons.folder_outlined),
+          _buildSectionHeader(context, 'Storage & Maintenance', LucideIcons.hardDrive),
           Card(
             child: Column(
               children: [
@@ -365,14 +366,14 @@ class _SettingsTabState extends State<SettingsTab> {
                 ),
                 const Divider(height: 1),
                 ListTile(
-                  leading: const Icon(Icons.delete_sweep_outlined, color: Colors.redAccent),
+                  leading: const Icon(LucideIcons.trash2, color: Colors.redAccent),
                   title: const Text('Clear All Downloaded Models'),
                   subtitle: const Text('Free up storage on device'),
                   onTap: _clearCache,
                 ),
                 const Divider(height: 1),
                 ListTile(
-                  leading: const Icon(Icons.photo_library_outlined),
+                  leading: const Icon(LucideIcons.image),
                   title: const Text('Gallery Storage Permission'),
                   subtitle: const Text('Check and grant gallery permissions'),
                   onTap: _requestPermission,
@@ -383,7 +384,7 @@ class _SettingsTabState extends State<SettingsTab> {
           const SizedBox(height: 16),
 
           // 5. About Section
-          _buildSectionHeader(context, 'About Omega', Icons.info_outline),
+          _buildSectionHeader(context, 'About Omega', LucideIcons.info),
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -392,7 +393,7 @@ class _SettingsTabState extends State<SettingsTab> {
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.auto_awesome, color: Color(0xFF6366F1), size: 24),
+                      const Icon(LucideIcons.sparkles, color: Color(0xFF6366F1), size: 24),
                       const SizedBox(width: 8),
                       Text(
                         'Omega Image Upscaler',

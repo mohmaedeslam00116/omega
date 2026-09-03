@@ -1,17 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../catalog/catalog_entry.dart';
 
 enum PresetContentType {
   photo(
     label: 'Photos',
-    icon: Icons.photo_camera_outlined,
-    activeIcon: Icons.photo_camera,
+    icon: LucideIcons.camera,
+    activeIcon: LucideIcons.camera,
     description: 'Realistic photos, portraits, and landscapes',
   ),
   anime(
     label: 'Art & Anime',
-    icon: Icons.palette_outlined,
-    activeIcon: Icons.palette,
+    icon: LucideIcons.palette,
+    activeIcon: LucideIcons.palette,
     description: 'Anime, manga, digital illustrations, and 2D art',
   );
 
@@ -31,31 +32,36 @@ enum PresetContentType {
 enum PresetQualityTier {
   lightning(
     label: 'Lightning',
-    badge: '⚡ Lightning (<1s)',
+    badge: 'Lightning (<1s)',
+    icon: LucideIcons.zap,
     description: 'Ultra-fast upscale on mobile GPU/CPU',
     tier: ModelTier.fast,
   ),
   balanced(
     label: 'Balanced',
-    badge: '⚖️ Balanced',
+    badge: 'Balanced',
+    icon: LucideIcons.scale,
     description: 'Optimal balance of speed and clarity',
     tier: ModelTier.balanced,
   ),
   ultraQuality(
     label: 'Ultra Quality',
-    badge: '💎 Ultra Quality',
+    badge: 'Ultra Quality',
+    icon: LucideIcons.sparkles,
     description: 'Maximum textures and fine details',
     tier: ModelTier.quality,
   );
 
   final String label;
   final String badge;
+  final IconData icon;
   final String description;
   final ModelTier tier;
 
   const PresetQualityTier({
     required this.label,
     required this.badge,
+    required this.icon,
     required this.description,
     required this.tier,
   });

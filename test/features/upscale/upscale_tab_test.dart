@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:omega/core/catalog/catalog_entry.dart';
 import 'package:omega/core/download/download_manager.dart';
@@ -545,7 +546,7 @@ void main() {
     expect(fakeIo.saveCalled, true);
 
     // Share
-    await tester.tap(find.byIcon(Icons.share_rounded));
+    await tester.tap(find.byIcon(LucideIcons.share2));
     await tester.pumpAndSettle();
     expect(fakeIo.shareCalled, true);
   });

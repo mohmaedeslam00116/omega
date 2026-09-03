@@ -2,6 +2,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:omega/features/upscale/models/batch_item.dart';
 import 'package:omega/features/upscale/widgets/batch_queue_carousel.dart';
 
@@ -51,9 +52,9 @@ void main() {
     expect(find.byType(Image), findsNWidgets(3));
 
     // Verify status icons
-    expect(find.byIcon(Icons.check_circle), findsOneWidget); // completed
+    expect(find.byIcon(LucideIcons.check), findsOneWidget); // completed
     expect(find.byType(CircularProgressIndicator), findsOneWidget); // processing
-    expect(find.byIcon(Icons.hourglass_empty_rounded), findsOneWidget); // pending
+    expect(find.byIcon(LucideIcons.clock), findsOneWidget); // pending
 
     // Tap item 2
     await tester.tap(find.byType(Image).at(1));
@@ -61,7 +62,7 @@ void main() {
     expect(selectedIdx, 1);
 
     // Tap Add More
-    await tester.tap(find.byIcon(Icons.add_photo_alternate_outlined));
+    await tester.tap(find.byIcon(LucideIcons.imagePlus));
     await tester.pump();
     expect(addCalled, true);
   });

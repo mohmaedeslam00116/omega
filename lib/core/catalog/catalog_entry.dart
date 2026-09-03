@@ -48,13 +48,15 @@ extension ModelTierPresentation on ModelTier {
   String get label {
     switch (this) {
       case ModelTier.fast:
-        return '⚡ Ultra Fast';
+        return 'Ultra Fast';
       case ModelTier.balanced:
-        return '⚖️ Balanced';
+        return 'Balanced';
       case ModelTier.quality:
-        return '💎 Ultra Quality';
+        return 'Ultra Quality';
     }
   }
+
+  String get displayName => label;
 
   int get bgColorValue {
     switch (this) {

@@ -2,6 +2,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:omega/features/upscale/widgets/comparison_slider.dart';
 
 Uint8List _png(int w, int h) {
@@ -61,7 +62,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(saved, true);
 
-    await tester.tap(find.byIcon(Icons.share_rounded));
+    await tester.tap(find.byIcon(LucideIcons.share2));
     await tester.pumpAndSettle();
     expect(shared, true);
 
