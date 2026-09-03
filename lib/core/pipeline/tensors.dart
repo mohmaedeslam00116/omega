@@ -31,18 +31,16 @@ Float32List preprocessTile(img.Image tile, {required int inputSize}) {
 /// `[1, outputSize, outputSize, 3]`, RGB, 0..1 (inverse of [preprocessTile]).
 /// Values are clamped to the representable 0..255 byte range.
 img.Image tileFromTensor(Float32List tensor, {required int outputSize}) {
-  final tile = img.Image(width: outputSize, height: outputSize);
+  final tile = img.Image(width: outputSize, height: outputSize, numChannels: 3);
   for (int y = 0; y < outputSize; y++) {
     for (int x = 0; x < outputSize; x++) {
       final i = (y * outputSize + x) * 3;
-      tile.setPixel(
+      tile.setPixelRgb(
         x,
         y,
-        img.ColorRgb8(
-          _toByte(tensor[i]),
-          _toByte(tensor[i + 1]),
-          _toByte(tensor[i + 2]),
-        ),
+        _toByte(tensor[i]),
+        _toByte(tensor[i + 1]),
+        _toByte(tensor[i + 2]),
       );
     }
   }

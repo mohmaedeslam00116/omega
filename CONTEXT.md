@@ -56,6 +56,34 @@ _Avoid_: normalize step, input preparation
 Compositing upscaled Tiles into the final image, feather-blending overlapping borders so no seams show.
 _Avoid_: glue, mosaic, paste
 
+### CascadedPipeline
+A sequential multi-stage vision workflow chaining specialized micro-models (e.g. Denoise 1x -> Upscale 4x -> Feature Refine) in a single unified job.
+_Avoid_: model chaining, multi-pass runner, pipeline stack
+
+### ModelRole
+The specific functional role of a micro-model within a pipeline (`denoise`, `upscale`, `face_refine`, `line_refine`).
+_Avoid_: model purpose, stage type
+
+### ModelBundle
+A logical grouping of atomic micro-models required to execute an end-to-end task pipeline (e.g. Anime Bundle, Photo Bundle).
+_Avoid_: model pack, zip archive
+
+### BundleResolver
+A service that verifies whether all atomic models in a required ModelBundle exist locally on disk, and calculates the exact list of missing models to download.
+_Avoid_: bundle checker, dependency solver
+
+### AdaptiveRouter
+Decision logic that inspects image metadata, edge density heuristics, or user preset selection to route tiles through the optimal CascadedPipeline chain.
+_Avoid_: model selector, type detector, auto switch
+
+### HybridTiledPipeline
+Tile-by-tile streaming execution across cascaded model stages with bounded intermediate tile memory and feather blending, avoiding full-frame intermediate RAM allocation.
+_Avoid_: tile buffer, in-memory bridge, stream processor
+
+### StageProgress
+Granular multi-stage progress telemetry reporting both current human-friendly stage description (e.g. "Step 1/2: Denoising") and unified 0-100% completion.
+_Avoid_: sub-progress, step tracker
+
 ### UpscaleJob
 A single, cancellable upscale operation with progress reporting, executed in a fresh background Isolate.
 _Avoid_: upscale task, job queue

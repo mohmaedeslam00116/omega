@@ -21,6 +21,7 @@ struct OmegaMNNContext {
     std::shared_ptr<MNN::Tensor> host_output;
     int current_side = 0;
     int scale = 4;
+    bool is_bgr = false;
 };
 
 #include <dlfcn.h>
@@ -61,6 +62,13 @@ OMEGA_EXPORT OmegaMNNContext* omega_mnn_create(
          model_path, forward_type, precision_mode, num_threads);
 
     auto* ctx = new OmegaMNNContext();
+    if (strstr(model_path, "RealESRGAN") || strstr(model_path, "realesrgan") || strstr(model_path, "anime_6B")) {
+        ctx->is_bgr = true;
+        LOGI("[OmegaMNN-Native] Detected BGR model format for: %s", model_path);
+    } else {
+        ctx->is_bgr = false;
+        LOGI("[OmegaMNN-Native] Using standard RGB model format for: %s", model_path);
+    }
 
     ctx->net = std::shared_ptr<MNN::Interpreter>(MNN::Interpreter::createFromFile(model_path));
     if (!ctx->net) {
@@ -171,9 +179,17 @@ OMEGA_EXPORT int omega_mnn_infer(
         for (int x = 0; x < inW; x++) {
             int nhwc_idx = (y * inW + x) * 3;
             int nchw_idx = y * inW + x;
-            host_in_ptr[nchw_idx] = input_data[nhwc_idx];                 // R
-            host_in_ptr[inPlane + nchw_idx] = input_data[nhwc_idx + 1];     // G
-            host_in_ptr[2 * inPlane + nchw_idx] = input_data[nhwc_idx + 2]; // B
+            if (ctx->is_bgr) {
+                // RealESRGAN expects BGR channel order
+                host_in_ptr[nchw_idx] = input_data[nhwc_idx + 2];                 // B -> Ch0
+                host_in_ptr[inPlane + nchw_idx] = input_data[nhwc_idx + 1];     // G -> Ch1
+                host_in_ptr[2 * inPlane + nchw_idx] = input_data[nhwc_idx];     // R -> Ch2
+            } else {
+                // Standard RGB models (SAFMN, PlainUSR, RFDN, ECBSR, NAFNet)
+                host_in_ptr[nchw_idx] = input_data[nhwc_idx];                 // R -> Ch0
+                host_in_ptr[inPlane + nchw_idx] = input_data[nhwc_idx + 1];     // G -> Ch1
+                host_in_ptr[2 * inPlane + nchw_idx] = input_data[nhwc_idx + 2]; // B -> Ch2
+            }
         }
     }
 
@@ -190,8 +206,8 @@ OMEGA_EXPORT int omega_mnn_infer(
     // Transfer device output -> host tensor
     ctx->output_tensor->copyToHostTensor(ctx->host_output.get());
 
-    int outH = ctx->output_tensor->height();
-    int outW = ctx->output_tensor->width();
+    int outH = ctx->output_tensor->height() > 0 ? ctx->output_tensor->height() : inH * ctx->scale;
+    int outW = ctx->output_tensor->width() > 0 ? ctx->output_tensor->width() : inW * ctx->scale;
     int outPlane = outH * outW;
     const float* host_out_ptr = ctx->host_output->host<float>();
 
@@ -200,9 +216,17 @@ OMEGA_EXPORT int omega_mnn_infer(
         for (int x = 0; x < outW; x++) {
             int nhwc_idx = (y * outW + x) * 3;
             int nchw_idx = y * outW + x;
-            output_data[nhwc_idx] = std::max(0.0f, std::min(1.0f, host_out_ptr[nchw_idx]));
-            output_data[nhwc_idx + 1] = std::max(0.0f, std::min(1.0f, host_out_ptr[outPlane + nchw_idx]));
-            output_data[nhwc_idx + 2] = std::max(0.0f, std::min(1.0f, host_out_ptr[2 * outPlane + nchw_idx]));
+            if (ctx->is_bgr) {
+                // RealESRGAN outputs BGR: Ch2 is Red, Ch1 is Green, Ch0 is Blue
+                output_data[nhwc_idx] = std::max(0.0f, std::min(1.0f, host_out_ptr[2 * outPlane + nchw_idx])); // R
+                output_data[nhwc_idx + 1] = std::max(0.0f, std::min(1.0f, host_out_ptr[outPlane + nchw_idx])); // G
+                output_data[nhwc_idx + 2] = std::max(0.0f, std::min(1.0f, host_out_ptr[nchw_idx]));             // B
+            } else {
+                // Standard RGB models
+                output_data[nhwc_idx] = std::max(0.0f, std::min(1.0f, host_out_ptr[nchw_idx]));                 // R
+                output_data[nhwc_idx + 1] = std::max(0.0f, std::min(1.0f, host_out_ptr[outPlane + nchw_idx])); // G
+                output_data[nhwc_idx + 2] = std::max(0.0f, std::min(1.0f, host_out_ptr[2 * outPlane + nchw_idx])); // B
+            }
         }
     }
 

@@ -2,9 +2,47 @@ import 'dart:convert';
 
 enum ModelType { general, anime, face }
 
+enum ModelRole { denoise, upscale, faceRefine, lineRefine }
+
 enum EngineBackend { tflite, mnn, onnx }
 
 enum ModelTier { fast, balanced, quality }
+
+enum TaskType { anime, photo, general }
+
+TaskType _taskTypeFromString(String? s) {
+  if (s != null) {
+    switch (s.toLowerCase()) {
+      case 'anime':
+        return TaskType.anime;
+      case 'photo':
+        return TaskType.photo;
+      case 'general':
+      default:
+        return TaskType.general;
+    }
+  }
+  return TaskType.general;
+}
+
+ModelRole _roleFromString(String? s) {
+  if (s != null) {
+    switch (s.toLowerCase()) {
+      case 'denoise':
+        return ModelRole.denoise;
+      case 'face_refine':
+      case 'facerefine':
+        return ModelRole.faceRefine;
+      case 'line_refine':
+      case 'linerefine':
+        return ModelRole.lineRefine;
+      case 'upscale':
+      default:
+        return ModelRole.upscale;
+    }
+  }
+  return ModelRole.upscale;
+}
 
 extension ModelTierPresentation on ModelTier {
   String get label {
@@ -90,12 +128,13 @@ ModelType _typeFromString(String s) {
 String _typeToString(ModelType t) => t.name;
 
 /// Immutable CatalogEntry describing a downloadable Model.
-/// Mirrors ADRs 0002 & 0004 & 0010 and CONTEXT.md CatalogEntry term.
+/// Mirrors ADRs 0002 & 0004 & 0010 & 0014 and CONTEXT.md CatalogEntry term.
 class CatalogEntry {
   final String id;
   final String name;
-  final int scale; // e.g., 4
+  final int scale; // e.g., 4 (or 1 for denoise/refinement)
   final ModelType type;
+  final ModelRole role;
   final EngineBackend backend;
   final ModelTier tier;
   final int inputSize; // e.g., 128
@@ -111,6 +150,7 @@ class CatalogEntry {
     required this.name,
     required this.scale,
     required this.type,
+    this.role = ModelRole.upscale,
     this.backend = EngineBackend.tflite,
     this.tier = ModelTier.balanced,
     required this.inputSize,
@@ -144,8 +184,8 @@ class CatalogEntry {
     final inputSize = json['inputSize'] as int;
     final license = json['license'] as String;
     final url = json['url'] as String;
-    if (scale != 4) {
-      throw FormatException('Invalid scale $scale, expected 4 for $json');
+    if (scale != 4 && scale != 1) {
+      throw FormatException('Invalid scale $scale for $json');
     }
     if (inputSize != 128) {
       throw FormatException(
@@ -160,6 +200,7 @@ class CatalogEntry {
       name: json['name'] as String,
       scale: scale,
       type: _typeFromString(json['type'] as String),
+      role: _roleFromString(json['role'] as String?),
       backend: _backendFromString(json['backend'] as String?, url),
       tier: _tierFromString(json['tier'] as String?, fileSize),
       inputSize: inputSize,
@@ -177,6 +218,7 @@ class CatalogEntry {
         'name': name,
         'scale': scale,
         'type': _typeToString(type),
+        'role': role.name,
         'backend': backend.name,
         'tier': tier.name,
         'inputSize': inputSize,
@@ -192,6 +234,49 @@ class CatalogEntry {
     final List<dynamic> decoded = json.decode(jsonStr) as List<dynamic>;
     return decoded
         .map((e) => CatalogEntry.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+}
+
+/// Immutable ModelBundle entity declaring an end-to-end task pipeline.
+class ModelBundle {
+  final String id;
+  final String name;
+  final TaskType taskType;
+  final List<String> modelIds;
+  final String description;
+
+  const ModelBundle({
+    required this.id,
+    required this.name,
+    required this.taskType,
+    required this.modelIds,
+    this.description = '',
+  });
+
+  factory ModelBundle.fromJson(Map<String, dynamic> json) {
+    return ModelBundle(
+      id: json['id'] as String,
+      name: json['name'] as String,
+      taskType: _taskTypeFromString(json['taskType'] as String?),
+      modelIds:
+          (json['modelIds'] as List<dynamic>).map((e) => e as String).toList(),
+      description: json['description'] as String? ?? '',
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'taskType': taskType.name,
+        'modelIds': modelIds,
+        'description': description,
+      };
+
+  static List<ModelBundle> listFromJson(String jsonStr) {
+    final List<dynamic> decoded = json.decode(jsonStr) as List<dynamic>;
+    return decoded
+        .map((e) => ModelBundle.fromJson(e as Map<String, dynamic>))
         .toList();
   }
 }
